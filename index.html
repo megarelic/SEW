@@ -148,7 +148,7 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.1</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.2</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -197,14 +197,14 @@
         <h2>🏬 Surface Merchant</h2>
         <button class="close-btn" id="btn-close-shop">✕</button>
       </div>
-      <div class="shop-section">
+      <div class="modal-section">
         <h3>Buy Supplies</h3>
         <div class="shop-row">
           <span>🌰 Sword Seed (🪙 10 Gold)</span>
           <button class="action-shop-btn" id="btn-buy-seed">Buy Seed</button>
         </div>
       </div>
-      <div class="shop-section">
+      <div class="modal-section">
         <h3>Sell Harvested Gear</h3>
         <div id="shop-sell-list" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;"></div>
       </div>
@@ -213,7 +213,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.3.1';
+    const GAME_VERSION = 'v1.3.2';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
@@ -502,11 +502,10 @@
     let dungeonCorpses = [];
     let minimapGfx;
 
-    // Vine System Variables
-    let dungeonVines = [];
-    let vineTips = [];
+    // Controlled Directional Vine System Variables
+    let vinePathNodes = [];
+    let vineCurrentIndex = 0;
     let vineEvent = null;
-    const MAX_VINE_SEGMENTS = 35;
 
     let currentSoilState = 'EMPTY';
     let dungeonGrid = [];
@@ -553,7 +552,6 @@
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // Vine Texture
       const vineGfx = scene.make.graphics({ add: false });
       vineGfx.fillStyle(0x15803d, 1).fillCircle(16, 16, 10);
       vineGfx.fillStyle(0x22c55e, 1).fillCircle(16, 16, 5);
@@ -727,73 +725,68 @@
       if (player.body) player.body.reset(spawnX, spawnY);
       scene.cameras.main.centerOn(spawnX, spawnY);
 
-      // --- VINE SYSTEM INITIALIZATION ---
-      dungeonVines = [];
-      vineTips = [];
+      // --- CONTROLLED LINEAR VINE SYSTEM INITIALIZATION ---
+      vinePathNodes = [];
+      vineCurrentIndex = 0;
+
       let lastRoom = rooms[rooms.length - 1];
-      let vineStartX = lastRoom.cx;
-      let vineStartY = lastRoom.cy;
+      let startX = startRoom.cx;
+      let startY = startRoom.cy;
+      let endX = lastRoom.cx;
+      let endY = lastRoom.cy;
 
-      dungeonVines.push(`${vineStartX},${vineStartY}`);
-      vineTips.push({ x: vineStartX, y: vineStartY });
+      // Build straight-ish stepping path nodes from start to end
+      let currX = startX;
+      let currY = startY;
+      vinePathNodes.push({ x: currX, y: currY, isBranch: false });
 
-      // Slow Spreading Vine Loop
+      while (currX !== endX || currY !== endY) {
+        if (currX !== endX) {
+          currX += (endX > currX) ? 1 : -1;
+        } else if (currY !== endY) {
+          currY += (endY > currY) ? 1 : -1;
+        }
+        
+        let isBr = (Math.random() < 0.25 && vinePathNodes.length > 2 && vinePathNodes.length < Math.abs(endX - startX));
+        vinePathNodes.push({ x: currX, y: currY, isBranch: isBr });
+      }
+
+      // Vine Growth Ticker
       vineEvent = scene.time.addEvent({
-        delay: 1200,
+        delay: 500,
         loop: true,
         callback: () => {
           if (currentZone !== 'DUNGEON' || isInventoryOpen || isShopOpen || isLootOpen) return;
 
-          if (vineTips.length === 0 || dungeonVines.length >= MAX_VINE_SEGMENTS) {
-            if (!exitDoor && vineTips.length > 0) {
-              let finalTip = vineTips[vineTips.length - 1];
-              exitDoor = scene.physics.add.sprite(finalTip.x * TILE_SIZE + TILE_SIZE/2, finalTip.y * TILE_SIZE + TILE_SIZE/2, 'exitDoorTex').setDepth(1);
-              document.getElementById('dialogue-box').innerText = "The dungeon vine has fully matured and spawned the Exit Door!";
+          if (vineCurrentIndex >= vinePathNodes.length) {
+            if (!exitDoor) {
+              let finalNode = vinePathNodes[vinePathNodes.length - 1];
+              exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'exitDoorTex').setDepth(1);
+              document.getElementById('dialogue-box').innerText = "The vine reached the end and blossomed into the Exit Door!";
             }
             return;
           }
 
-          let tipIdx = Phaser.Math.Between(0, vineTips.length - 1);
-          let tip = vineTips[tipIdx];
-          const dirs = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
-          Phaser.Utils.Array.Shuffle(dirs);
+          let node = vinePathNodes[vineCurrentIndex];
+          let px = node.x * TILE_SIZE + TILE_SIZE/2;
+          let py = node.y * TILE_SIZE + TILE_SIZE/2;
 
-          let grown = false;
-          for (let d of dirs) {
-            let nx = tip.x + d.x;
-            let ny = tip.y + d.y;
-            let key = `${nx},${ny}`;
+          let vSprite = scene.add.image(px, py, 'vineTex').setDepth(1);
+          dungeonFloorTiles.push(vSprite);
 
-            if (nx > 0 && nx < MAP_GRID_SIZE - 1 && ny > 0 && ny < MAP_GRID_SIZE - 1) {
-              if (dungeonGrid[ny][nx] === 0 && !dungeonVines.includes(key)) {
-                dungeonVines.push(key);
-                vineTips.push({ x: nx, y: ny });
-
-                let px = nx * TILE_SIZE + TILE_SIZE/2;
-                let py = ny * TILE_SIZE + TILE_SIZE/2;
-                let vSprite = scene.add.image(px, py, 'vineTex').setDepth(1);
-                dungeonFloorTiles.push(vSprite);
-
-                // 20% chance vine buds into a mini enemy
-                if (Math.random() < 0.20) {
-                  let enemy = scene.physics.add.sprite(px, py, 'enemyTex').setDepth(2);
-                  enemy.maxHp = 30;
-                  enemy.hp = 30;
-                  enemy.body.setSize(20, 20);
-                  enemy.hpBar = scene.add.graphics().setDepth(3);
-                  updateEnemyHpBar(enemy);
-                  scene.physics.add.collider(enemy, dungeonWalls);
-                  dungeonEnemies.push(enemy);
-                }
-
-                grown = true;
-                break;
-              }
-            }
+          // If node has a branch, spawn a mini enemy
+          if (node.isBranch) {
+            let enemy = scene.physics.add.sprite(px, py, 'enemyTex').setDepth(2);
+            enemy.maxHp = 30;
+            enemy.hp = 30;
+            enemy.body.setSize(20, 20);
+            enemy.hpBar = scene.add.graphics().setDepth(3);
+            updateEnemyHpBar(enemy);
+            scene.physics.add.collider(enemy, dungeonWalls);
+            dungeonEnemies.push(enemy);
           }
-          if (!grown) {
-            vineTips.splice(tipIdx, 1);
-          }
+
+          vineCurrentIndex++;
         }
       });
 
@@ -806,7 +799,7 @@
         }
       }
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Watch the glowing vines spread to spawn enemies and the Exit Door!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Watch the controlled vine grow along the path to spawn enemies and the exit!";
       updateUI();
     }
 
@@ -938,7 +931,7 @@
             return;
           }
         } else {
-          dialogue.innerText = "The Exit Door has not sprouted yet! Wait for the vines to grow.";
+          dialogue.innerText = "The Exit Door has not sprouted yet! Wait for the vine to finish growing.";
         }
       }
     }
