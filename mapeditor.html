@@ -2,21 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mobile Tilemap Editor</title>
     <style>
         * { box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; }
-        #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
-        #canvas-container { flex: 1; position: relative; overflow: hidden; background: #181818; display: flex; justify-content: center; align-items: center; }
+        
+        #app { display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh; position: relative; overflow: hidden; }
+        
+        #canvas-container { flex: 1; position: relative; overflow: hidden; background: #181818; display: flex; justify-content: center; align-items: center; min-height: 0; }
         canvas { display: block; background: #222; }
         
         /* UI Overlays */
         #top-bar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 5; }
-        .hud-badge { background: rgba(0, 0, 0, 0.7); padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); pointer-events: auto; backdrop-filter: blur(4px); }
+        .hud-badge { background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid rgba(255,255,255,0.15); pointer-events: auto; backdrop-filter: blur(4px); }
 
-        #toolbar { height: 75px; background: #202020; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; border-top: 1px solid #333; z-index: 10; flex-shrink: 0; }
-        .tool-btn { background: #2c2c2c; color: white; border: 1px solid #444; padding: 10px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 60px; }
+        #toolbar { height: 75px; min-height: 75px; background: #202020; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; border-top: 1px solid #333; z-index: 10; flex-shrink: 0; width: 100%; }
+        .tool-btn { background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px 10px; border-radius: 8px; font-size: 11px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 52px; height: 55px; }
         .tool-btn:active, .tool-btn.active { background: #00bcd4; color: #000; border-color: #00bcd4; }
         
         /* Drawer for Tileset Palette */
@@ -59,7 +61,7 @@
             </label>
             <button class="tool-btn" id="btnPalette">🖼️ Tiles</button>
             <button class="tool-btn" id="btnRotate">🔄 0°</button>
-            <button class="tool-btn" id="btnLayer">📑 Layer 0</button>
+            <button class="tool-btn" id="btnLayer">📑 L0</button>
             <button class="tool-btn" id="btnMode">🖌️ Paint</button>
             <button class="tool-btn" id="btnExport">💾 Export</button>
         </div>
@@ -69,39 +71,35 @@
         const canvas = document.getElementById('editorCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Config
         const TILE_SIZE = 32;
         const MAP_WIDTH = 25;
         const MAP_HEIGHT = 25;
 
-        // Viewport State
         let scale = 1;
         let panX = 0;
         let panY = 0;
 
-        // Editor State
         let currentLayer = 0;
         let maxLayers = 3;
-        let currentRotation = 0; // 0, 90, 180, 270
-        let currentMode = 'paint'; // 'paint', 'erase', 'pan'
-        let tilesets = []; // Array of Image objects & metadata
+        let currentRotation = 0; 
+        let currentMode = 'paint'; 
+        let tilesets = []; 
         let selectedTile = { tilesetIndex: 0, tileX: 0, tileY: 0 };
-        let activePaletteSource = { tilesetIndex: 0, tileX: 0, tileY: 0 };
 
-        // Multi-layer map structure: layers[layerIndex][y][x] = tileObj or null
         let layers = Array(maxLayers).fill(0).map(() => 
             Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill(null))
         );
 
         function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
             draw();
         }
         window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
         resizeCanvas();
 
-        // UI Elements & Bindings
         const hudInfo = document.getElementById('hudInfo');
         const hudTool = document.getElementById('hudTool');
         const paletteDrawer = document.getElementById('palette-drawer');
@@ -112,7 +110,6 @@
             hudTool.textContent = `Mode: ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)}`;
         }
 
-        // Handle File Uploads (Multiple Tilesets)
         document.getElementById('uploadTiles').addEventListener('change', (e) => {
             const files = e.target.files;
             if (!files.length) return;
@@ -137,7 +134,7 @@
                 };
                 reader.readAsDataURL(file);
             });
-            e.target.value = ''; // Reset input
+            e.target.value = '';
         });
 
         function rebuildPaletteUI() {
@@ -163,7 +160,6 @@
                 const tsCtx = tsCanvas.getContext('2d');
                 tsCtx.drawImage(ts.image, 0, 0);
 
-                // Selection border overlay logic via click
                 tsCanvas.addEventListener('click', (e) => {
                     const rect = tsCanvas.getBoundingClientRect();
                     const clickX = e.clientX - rect.left;
@@ -182,7 +178,6 @@
             });
         }
 
-        // Drawer Controls
         document.getElementById('btnPalette').addEventListener('click', () => {
             paletteDrawer.classList.toggle('open');
         });
@@ -190,34 +185,30 @@
             paletteDrawer.classList.remove('open');
         });
 
-        // Rotation Control
         const btnRotate = document.getElementById('btnRotate');
         btnRotate.addEventListener('click', () => {
             currentRotation = (currentRotation + 90) % 360;
             btnRotate.textContent = `🔄 ${currentRotation}°`;
         });
 
-        // Layer Switching
         const btnLayer = document.getElementById('btnLayer');
         btnLayer.addEventListener('click', () => {
             currentLayer = (currentLayer + 1) % maxLayers;
-            btnLayer.textContent = `📑 Layer ${currentLayer}`;
+            btnLayer.textContent = `📑 L${currentLayer}`;
             updateHUD();
             draw();
         });
 
-        // Mode Switching
         const btnMode = document.getElementById('btnMode');
         btnMode.addEventListener('click', () => {
             if (currentMode === 'paint') currentMode = 'erase';
             else if (currentMode === 'erase') currentMode = 'pan';
             else currentMode = 'paint';
             
-            btnMode.textContent = currentMode === 'paint' ? '🖌️ Paint' : currentMode === 'erase' ? '橡 Erase' : '🖐️ Pan';
+            btnMode.textContent = currentMode === 'paint' ? '🖌️ Paint' : currentMode === 'erase' ? '🧹 Erase' : '🖐️ Pan';
             updateHUD();
         });
 
-        // Export System
         document.getElementById('btnExport').addEventListener('click', () => {
             const exportData = {
                 width: MAP_WIDTH,
@@ -234,7 +225,6 @@
             downloadAnchor.remove();
         });
 
-        // Main Draw Loop
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -247,13 +237,10 @@
             const originX = -mapPixelW / 2;
             const originY = -mapPixelH / 2;
 
-            // Background Boundary Box
             ctx.fillStyle = '#1c1c1c';
             ctx.fillRect(originX, originY, mapPixelW, mapPixelH);
 
-            // Render Layers
             for (let l = 0; l < layers.length; l++) {
-                // Dim inactive layers slightly for editing focus
                 ctx.globalAlpha = (l === currentLayer) ? 1.0 : 0.35;
 
                 for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -279,7 +266,6 @@
             }
             ctx.globalAlpha = 1.0;
 
-            // Draw Grid Lines on Top Layer
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
             ctx.lineWidth = 1 / scale;
             for (let x = 0; x <= MAP_WIDTH; x++) {
@@ -298,17 +284,16 @@
             ctx.restore();
         }
 
-        // Pointer & Multi-Touch Gestures Handling (Pan, Zoom, Paint)
         let pointers = new Map();
         let initialPinchDistance = null;
         let initialScale = 1;
 
         canvas.addEventListener('pointerdown', (e) => {
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            paletteDrawer.classList.remove('open'); // Close drawer if open during canvas interaction
+            paletteDrawer.classList.remove('open');
 
             if (pointers.size === 1) {
-                handleInteraction(e, false);
+                handleInteraction(e);
             } else if (pointers.size === 2) {
                 initialPinchDistance = getPinchDistance();
                 initialScale = scale;
@@ -321,7 +306,6 @@
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
             if (pointers.size === 2 && initialPinchDistance) {
-                // Handle Pinch Zoom
                 const currentDistance = getPinchDistance();
                 const scaleFactor = currentDistance / initialPinchDistance;
                 scale = Math.min(Math.max(0.5, initialScale * scaleFactor), 4.0);
@@ -333,16 +317,14 @@
                     panY += e.clientY - prev.y;
                     draw();
                 } else {
-                    handleInteraction(e, true);
+                    handleInteraction(e);
                 }
             }
         });
 
         window.addEventListener('pointerup', (e) => {
             pointers.delete(e.pointerId);
-            if (pointers.size < 2) {
-                initialPinchDistance = null;
-            }
+            if (pointers.size < 2) initialPinchDistance = null;
         });
 
         window.addEventListener('pointercancel', (e) => {
@@ -354,14 +336,13 @@
             return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         }
 
-        function handleInteraction(e, isDragging) {
+        function handleInteraction(e) {
             if (currentMode === 'pan') return;
 
             const rect = canvas.getBoundingClientRect();
             const clientX = e.clientX - rect.left;
             const clientY = e.clientY - rect.top;
 
-            // Screen to Map coordinate conversion accounting for centering and zoom/pan matrix
             const worldX = clientX - (canvas.width / 2 + panX);
             const worldY = clientY - (canvas.height / 2 + panY);
 
@@ -377,7 +358,7 @@
                 if (currentMode === 'paint' && tilesets.length > 0) {
                     layers[currentLayer][tileY][tileX] = {
                         tilesetIndex: selectedTile.tilesetIndex,
-                        tileX: selectedTile.tileX,
+                        tileX: selectedTrustTileX = selectedTile.tileX,
                         tileY: selectedTile.tileY,
                         rotation: currentRotation
                     };
