@@ -101,7 +101,6 @@
     #btn-plant { background: rgba(168, 85, 247, 0.5); border: 3px solid rgba(168, 85, 247, 0.9); font-size: 14px; }
     #btn-plant:active { transform: scale(0.95); }
 
-    /* Hold Progress Ring for Plant Button */
     #plant-progress {
       position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
       background: rgba(255, 255, 255, 0.4); transition: height 0.05s linear; pointer-events: none;
@@ -122,36 +121,36 @@
       display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid #334155; padding-bottom: 8px;
     }
-    .modal-header h2 { font-size: 16px; color: #38bdf8; }
+    .modal-header h2 { font-size: 15px; color: #38bdf8; }
     .close-btn {
       background: #ef4444; border: none; color: #fff; font-weight: bold;
       padding: 4px 10px; border-radius: 6px; cursor: pointer;
     }
 
-    .inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 180px; overflow-y: auto; }
+    .inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 200px; overflow-y: auto; padding-right: 4px; }
     .inv-slot {
       aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 10px; text-align: center; padding: 4px; color: #cbd5e1; cursor: pointer;
+      font-size: 9px; text-align: center; padding: 2px; color: #cbd5e1; cursor: pointer;
     }
     .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
     .inv-slot.equipped { border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.2); }
 
     .loot-container {
-      display: flex; gap: 16px; justify-content: space-between;
+      display: flex; gap: 12px; justify-content: space-between;
     }
     .loot-pane {
-      flex: 1; background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid #334155;
+      flex: 1; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #334155;
     }
-    .loot-pane h3 { font-size: 12px; color: #38bdf8; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .loot-pane h3 { font-size: 11px; color: #38bdf8; margin-bottom: 6px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
 
-    .shop-section { display: flex; flex-direction: column; gap: 8px; }
-    .shop-section h3 { font-size: 13px; color: #f1f5f9; border-bottom: 1px dashed #334155; padding-bottom: 4px; }
+    .shop-section { display: flex; flex-direction: column; gap: 6px; }
+    .shop-section h3 { font-size: 12px; color: #f1f5f9; border-bottom: 1px dashed #334155; padding-bottom: 4px; }
     .shop-row {
       display: flex; justify-content: space-between; align-items: center;
-      background: #0f172a; padding: 8px 12px; border-radius: 6px; border: 1px solid #334155; font-size: 12px;
+      background: #0f172a; padding: 6px 10px; border-radius: 6px; border: 1px solid #334155; font-size: 11px;
     }
-    .action-shop-btn { background: #22c55e; border: none; color: #fff; font-weight: bold; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .action-shop-btn { background: #22c55e; border: none; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
     .sell-btn { background: #eab308; color: #0f172a; }
   </style>
 </head>
@@ -164,11 +163,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.1</div>
-    <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.2</div>
+    <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Use [A] to Attack, [P] to Plant/Harvest, [L] to Loot!</div>
+  <div id="dialogue-box">Surface Hub: Use [A] to Attack, [P] to Plant, [L] to Loot!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -179,14 +178,14 @@
     </div>
   </div>
 
-  <!-- Inventory Modal -->
+  <!-- Inventory Modal (16 Slots) -->
   <div id="inventory-modal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>🎒 Stash & Inventory (Double-Tap to Equip/Unequip)</h2>
+        <h2>🎒 Stash & Inventory (16 Slots - Double-Tap to Equip)</h2>
         <button class="close-btn" id="btn-close-inv">✕</button>
       </div>
-      <div class="inv-grid" id="inv-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 240px;"></div>
+      <div class="inv-grid" id="inv-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 220px;"></div>
     </div>
   </div>
 
@@ -200,11 +199,11 @@
       <div class="loot-container">
         <div class="loot-pane">
           <h3>Enemy Loot</h3>
-          <div class="inv-grid" id="loot-npc-grid" style="grid-template-columns: repeat(2, 1fr);"></div>
+          <div class="inv-grid" id="loot-npc-grid" style="grid-template-columns: repeat(2, 1fr); max-height: 180px;"></div>
         </div>
         <div class="loot-pane">
-          <h3>Your Inventory</h3>
-          <div class="inv-grid" id="loot-player-grid" style="grid-template-columns: repeat(2, 1fr);"></div>
+          <h3>Your Stash (16 Slots)</h3>
+          <div class="inv-grid" id="loot-player-grid" style="grid-template-columns: repeat(2, 1fr); max-height: 180px;"></div>
         </div>
       </div>
     </div>
@@ -230,17 +229,17 @@
       </div>
       <div class="shop-section">
         <h3>Sell Harvested Gear</h3>
-        <div id="shop-sell-list" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;"></div>
+        <div id="shop-sell-list" style="max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
       </div>
     </div>
   </div>
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.1';
+    const GAME_VERSION = 'v1.4.2';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
-    // --- 1. LOCAL STORAGE & INVENTORY ---
+    // --- 1. LOCAL STORAGE & 16-SLOT INVENTORY ---
     const DEFAULT_DATA = { 
       hp: 100, 
       maxHp: 100, 
@@ -269,6 +268,7 @@
     let isLootOpen = false;
     let activeCorpseLoot = null;
     let currentZone = 'HUB';
+    const MAX_INVENTORY_SLOTS = 16;
 
     function getPlayerItemCount(itemName) {
       let total = 0;
@@ -288,7 +288,7 @@
         }
       }
 
-      if (playerData.inventory.length < 8) {
+      if (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
         if (itemName === 'Gold' || itemName === 'Sword Seed' || itemName === 'Bow Seed') {
           playerData.inventory.push({ name: itemName, count: count });
         } else {
@@ -323,7 +323,7 @@
         `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | 🪙 ${gold} | 🌰 ${swords} | 🏹 ${bows} | Eq: ⚔️/🏹 ${eq}`;
     }
 
-    // --- 2. MODALS & INVENTORY ACTIONS ---
+    // --- 2. MODALS & 16-SLOT INVENTORY ACTIONS ---
     const invModal = document.getElementById('inventory-modal');
     const shopModal = document.getElementById('shop-modal');
     const lootModal = document.getElementById('loot-modal');
@@ -335,7 +335,7 @@
       invModal.style.display = show ? 'flex' : 'none';
       if (show) {
         invGrid.innerHTML = '';
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < MAX_INVENTORY_SLOTS; i++) {
           const slot = document.createElement('div');
           slot.className = 'inv-slot';
           let item = playerData.inventory[i];
@@ -346,8 +346,8 @@
             if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold<br>(${item.count})`;
             else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Sword Seed<br>(${item.count})`;
             else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>Bow Seed<br>(${item.count})`;
-            else if (item.name === 'Iron Sword') slot.innerHTML = `⚔️<br>Iron Sword${item.name === playerData.equipped ? '<br>(Equipped)' : ''}`;
-            else if (item.name === 'Hunting Bow') slot.innerHTML = `🏹<br>Hunting Bow${item.name === playerData.equipped ? '<br>(Equipped)' : ''}`;
+            else if (item.name === 'Iron Sword') slot.innerHTML = `⚔️<br>Iron Sword${item.name === playerData.equipped ? '<br>(Eq)' : ''}`;
+            else if (item.name === 'Hunting Bow') slot.innerHTML = `🏹<br>Hunting Bow${item.name === playerData.equipped ? '<br>(Eq)' : ''}`;
 
             let lastTap = 0;
             slot.addEventListener('pointerdown', (e) => {
@@ -420,10 +420,6 @@
         else if (itemObj.name === 'Iron Sword') slot.innerHTML = `⚔️ Iron Sword`;
         else if (itemObj.name === 'Hunting Bow') slot.innerHTML = `🏹 Hunting Bow`;
 
-        slot.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', JSON.stringify({ source: 'NPC', index: idx }));
-        });
-
         let lastTap = 0;
         slot.addEventListener('pointerdown', (e) => {
           let currentTime = new Date().getTime();
@@ -444,7 +440,7 @@
         npcGrid.innerHTML = '<div style="font-size:10px; color:#64748b; grid-column:span 2;">Empty</div>';
       }
 
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < MAX_INVENTORY_SLOTS; i++) {
         const slot = document.createElement('div');
         slot.className = 'inv-slot';
         let item = playerData.inventory[i];
@@ -559,7 +555,6 @@
       plantStartTime = Date.now();
       plantProgressBar.style.height = '0%';
 
-      // Check if standing near soil for harvest (immediate) vs planting (hold)
       const scene = game.scene.scenes[0];
       if (!scene) return;
 
@@ -576,12 +571,10 @@
       }
 
       if (targetSoil && targetSoil.state === 'READY') {
-        // Immediate harvest on tap if ready
         handleSoilAction(scene, targetSoil);
         return;
       }
 
-      // Otherwise start 3-second hold timer for planting
       plantHoldTimer = setInterval(() => {
         let elapsed = Date.now() - plantStartTime;
         let pct = Math.min(100, (elapsed / 3000) * 100);
@@ -799,13 +792,11 @@
 
       cursors = scene.input.keyboard.createCursorKeys();
 
-      // Combat Action Button [A]
       document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
         e.preventDefault();
         handleCombatAction(scene);
       });
 
-      // Dedicated Loot Button [L]
       document.getElementById('btn-loot').addEventListener('pointerdown', (e) => {
         e.preventDefault();
         handleLootAction(scene);
@@ -938,7 +929,6 @@
         }
       }
 
-      // --- BFS PATHFINDING VINE WITH OFFSHOOTS & 1-MINUTE GROWTH TIME ---
       vinePathNodes = [];
       vineOffshoots = [];
       vineCurrentIndex = 0;
@@ -1038,7 +1028,7 @@
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Explore and use dedicated [A], [P], and [L] buttons!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: 16 inventory slots active!";
       updateUI();
     }
 
