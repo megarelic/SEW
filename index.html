@@ -148,7 +148,7 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.4</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.5</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -213,7 +213,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.3.4';
+    const GAME_VERSION = 'v1.3.5';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
@@ -667,7 +667,7 @@
 
       dungeonGrid = Array(MAP_GRID_SIZE).fill(null).map(() => Array(MAP_GRID_SIZE).fill(1));
       let rooms = [];
-      const numRooms = 7;
+      const numRooms = 8;
 
       for (let i = 0; i < numRooms; i++) {
         let w = Phaser.Math.Between(5, 8);
@@ -686,6 +686,7 @@
         }
       }
 
+      // Ensure all rooms connect in sequence
       for (let i = 0; i < rooms.length - 1; i++) {
         let r1 = rooms[i];
         let r2 = rooms[i + 1];
@@ -719,7 +720,18 @@
         }
       }
 
+      // Pick Start Room (Index 0) and Guaranteed Farthest Room as Target/Exit Room
       let startRoom = rooms[0];
+      let targetRoom = rooms[1];
+      let maxDist = -1;
+      for (let i = 1; i < rooms.length; i++) {
+        let dist = Phaser.Math.Distance.Between(startRoom.cx, startRoom.cy, rooms[i].cx, rooms[i].cy);
+        if (dist > maxDist) {
+          maxDist = dist;
+          targetRoom = rooms[i];
+        }
+      }
+
       const spawnX = startRoom.cx * TILE_SIZE;
       const spawnY = startRoom.cy * TILE_SIZE;
 
@@ -727,9 +739,11 @@
       if (player.body) player.body.reset(spawnX, spawnY);
       scene.cameras.main.centerOn(spawnX, spawnY);
 
-      // Standard Normal Enemy Spawns across rooms
-      for (let i = 1; i < rooms.length - 1; i++) {
+      // Standard Normal Enemy Spawns across intermediate rooms
+      for (let i = 0; i < rooms.length; i++) {
         let rm = rooms[i];
+        if (rm === startRoom) continue;
+
         let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex').setDepth(2);
         enemy.maxHp = 40;
         enemy.hp = 40;
@@ -746,22 +760,21 @@
         }
       }
 
-      // --- RANDOMIZED ORGANIC CONNECTED VINE SYSTEM (WALKABLE FLOOR ONLY) ---
+      // --- RANDOMIZED ORGANIC CONNECTED VINE SYSTEM (FAR ROOM EXIT) ---
       vinePathNodes = [];
       vineCurrentIndex = 0;
       vineGraphics = scene.add.graphics().setDepth(1);
 
-      let lastRoom = rooms[rooms.length - 1];
       let currX = startRoom.cx;
       let currY = startRoom.cy;
-      let targetX = lastRoom.cx;
-      let targetY = lastRoom.cy;
+      let targetX = targetRoom.cx;
+      let targetY = targetRoom.cy;
 
       vinePathNodes.push({ x: currX, y: currY, spawnType: 'NONE' });
 
-      // Build random wandering path strictly inside walkable dungeon tiles (dungeonGrid === 0)
+      // Build random wandering path strictly inside walkable dungeon tiles toward the farthest room
       let safetyCount = 0;
-      while ((currX !== targetX || currY !== targetY) && safetyCount < 300) {
+      while ((currX !== targetX || currY !== targetY) && safetyCount < 400) {
         safetyCount++;
         let steps = [{x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}];
         Phaser.Utils.Array.Shuffle(steps);
@@ -771,14 +784,14 @@
           let nx = currX + s.x;
           let ny = currY + s.y;
           if (nx > 0 && nx < MAP_GRID_SIZE - 1 && ny > 0 && ny < MAP_GRID_SIZE - 1 && dungeonGrid[ny][nx] === 0) {
-            if (Math.abs(targetX - nx) + Math.abs(targetY - ny) <= Math.abs(targetX - currX) + Math.abs(targetY - currY) || Math.random() < 0.3) {
+            if (Math.abs(targetX - nx) + Math.abs(targetY - ny) <= Math.abs(targetX - currX) + Math.abs(targetY - currY) || Math.random() < 0.25) {
               currX = nx;
               currY = ny;
               
               let sType = 'NONE';
               let rNum = Math.random();
-              if (rNum < 0.20) sType = 'ENEMY';
-              else if (rNum < 0.35) sType = 'GOO';
+              if (rNum < 0.18) sType = 'ENEMY';
+              else if (rNum < 0.32) sType = 'GOO';
 
               vinePathNodes.push({ x: currX, y: currY, spawnType: sType });
               moved = true;
@@ -792,7 +805,7 @@
           } else if (currY !== targetY && dungeonGrid[(targetY > currY) ? currY + 1 : currY - 1][currX] === 0) {
             currY += (targetY > currY) ? 1 : -1;
           } else {
-            break; // If fully cornered, snap directly to target room node
+            break;
           }
           vinePathNodes.push({ x: currX, y: currY, spawnType: 'NONE' });
         }
@@ -800,7 +813,7 @@
 
       // Vine Growth Ticker
       vineEvent = scene.time.addEvent({
-        delay: 350,
+        delay: 250,
         loop: true,
         callback: () => {
           if (currentZone !== 'DUNGEON' || isInventoryOpen || isShopOpen || isLootOpen) return;
@@ -809,7 +822,7 @@
             if (!exitDoor) {
               let finalNode = vinePathNodes[vinePathNodes.length - 1];
               exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'exitDoorTex').setDepth(1);
-              document.getElementById('dialogue-box').innerText = "The vine has completed its growth and blossomed into the Exit Door!";
+              document.getElementById('dialogue-box').innerText = "The vine reached the far room and blossomed into the Exit Door!";
             }
             return;
           }
@@ -817,14 +830,12 @@
           let p1 = vinePathNodes[vineCurrentIndex];
           let p2 = vinePathNodes[vineCurrentIndex + 1];
 
-          // Draw connected organic vine line segment
           vineGraphics.lineStyle(4, 0x22c55e, 1);
           vineGraphics.beginPath();
           vineGraphics.moveTo(p1.x * TILE_SIZE + TILE_SIZE/2, p1.y * TILE_SIZE + TILE_SIZE/2);
           vineGraphics.lineTo(p2.x * TILE_SIZE + TILE_SIZE/2, p2.y * TILE_SIZE + TILE_SIZE/2);
           vineGraphics.strokePath();
 
-          // Spawn branches / enemies / goo
           let px = p2.x * TILE_SIZE + TILE_SIZE/2;
           let py = p2.y * TILE_SIZE + TILE_SIZE/2;
 
@@ -846,7 +857,7 @@
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The organic vine creeps safely along walkable floors, spawning hazards!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The vine winds across the map to a far-away exit!";
       updateUI();
     }
 
