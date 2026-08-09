@@ -147,7 +147,7 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.8</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.9</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -216,7 +216,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.3.8';
+    const GAME_VERSION = 'v1.3.9';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -794,7 +794,7 @@
         }
       }
 
-      // --- TRUE BFS PATHFINDING VINE (NO ENEMY SPAWNS) ---
+      // --- BFS PATHFINDING VINE WITH TAPERED THICKNESS & SLOWER SPEED ---
       vinePathNodes = [];
       vineCurrentIndex = 0;
       vineGraphics = scene.add.graphics().setDepth(1);
@@ -802,7 +802,6 @@
       let startNode = { x: startRoom.cx, y: startRoom.cy };
       let targetNode = { x: targetRoom.cx, y: targetRoom.cy };
 
-      // Breadth-First Search (BFS) for precise, optimal floor routing
       let queue = [[startNode]];
       let visited = Array(MAP_GRID_SIZE).fill(null).map(() => Array(MAP_GRID_SIZE).fill(false));
       visited[startNode.y][startNode.x] = true;
@@ -832,10 +831,10 @@
         }
       }
 
-      vinePathNodes = shortestPath || [{ x: startNode.x, y: startNode.y }, { x: targetNode.x, y: targetNode.y }];
+      vinePathNodes = shortestPath || [{ x: startNode.x, x: startNode.y }, { x: targetNode.x, y: targetNode.y }];
 
       vineEvent = scene.time.addEvent({
-        delay: 40,
+        delay: 120, // Slower growth speed
         loop: true,
         callback: () => {
           if (currentZone !== 'DUNGEON' || isInventoryOpen || isShopOpen || isLootOpen) return;
@@ -849,20 +848,29 @@
             return;
           }
 
-          let p1 = vinePathNodes[vineCurrentIndex];
-          let p2 = vinePathNodes[vineCurrentIndex + 1];
-
-          vineGraphics.lineStyle(4, 0x22c55e, 1);
-          vineGraphics.beginPath();
-          vineGraphics.moveTo(p1.x * TILE_SIZE + TILE_SIZE/2, p1.y * TILE_SIZE + TILE_SIZE/2);
-          vineGraphics.lineTo(p2.x * TILE_SIZE + TILE_SIZE/2, p2.y * TILE_SIZE + TILE_SIZE/2);
-          vineGraphics.strokePath();
-
+          vineGraphics.clear();
           vineCurrentIndex++;
+
+          // Redraw entire vine up to current index with tapered thickness (older = thicker, newer = thinner)
+          let totalSegments = vineCurrentIndex;
+          for (let i = 0; i < totalSegments; i++) {
+            let p1 = vinePathNodes[i];
+            let p2 = vinePathNodes[i + 1];
+
+            // Calculate thickness ratio: older segments near start (i = 0) are thick (width 6), newer tips are thin (width 1)
+            let progress = i / Math.max(1, vinePathNodes.length);
+            let thickness = Phaser.Math.Linear(6, 1, progress);
+
+            vineGraphics.lineStyle(thickness, 0x22c55e, 1);
+            vineGraphics.beginPath();
+            vineGraphics.moveTo(p1.x * TILE_SIZE + TILE_SIZE/2, p1.y * TILE_SIZE + TILE_SIZE/2);
+            vineGraphics.lineTo(p2.x * TILE_SIZE + TILE_SIZE/2, p2.y * TILE_SIZE + TILE_SIZE/2);
+            vineGraphics.strokePath();
+          }
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The vine pathfinds cleanly to the distant exit!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The vine creeps slowly, thick at the base and slender at the tip!";
       updateUI();
     }
 
