@@ -153,11 +153,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.5.0</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.5.1</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Wall directional tiling (4,3 top, 3,0 bottom, 0,0 void) active!</div>
+  <div id="dialogue-box">Surface Hub: Wall tiles updated (Bottom: 0,2, Right: 1,1, Left: 1,3)!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -222,7 +222,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.5.0';
+    const GAME_VERSION = 'v1.5.1';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -651,7 +651,9 @@
       extractTileTexture(scene, 'playerTex', 0, 7);      // Player at (0,7)
       extractTileTexture(scene, 'enemyTex', 0, 9);       // Enemy at (0,9)
       extractTileTexture(scene, 'wallTopTex', 4, 3);     // Top wall at (4,3)
-      extractTileTexture(scene, 'wallBottomTex', 3, 0);  // Bottom wall at (3,0)
+      extractTileTexture(scene, 'wallBottomTex', 0, 2);  // Bottom wall at (0,2)
+      extractTileTexture(scene, 'wallRightTex', 1, 1);   // Right wall at (1,1)
+      extractTileTexture(scene, 'wallLeftTex', 1, 3);    // Left wall at (1,3)
       extractTileTexture(scene, 'wallVoidTex', 0, 0);    // Internal wall void at (0,0)
       extractTileTexture(scene, 'hubFloorTex', 0, 4);    // Hub ground
       extractTileTexture(scene, 'dungFloorTex', 1, 4);   // Dungeon ground
@@ -952,7 +954,15 @@
             }
             // Bottom side of a room (room floor is directly above)
             else if (y - 1 >= 0 && dungeonGrid[y - 1][x] === 0) {
-              wallKey = 'wallBottomTex'; // (3,0)
+              wallKey = 'wallBottomTex'; // (0,2)
+            }
+            // Right side of a room (room floor is directly to the left)
+            else if (x - 1 >= 0 && dungeonGrid[y][x - 1] === 0) {
+              wallKey = 'wallRightTex'; // (1,1)
+            }
+            // Left side of a room (room floor is directly to the right)
+            else if (x + 1 < MAP_GRID_SIZE && dungeonGrid[y][x + 1] === 0) {
+              wallKey = 'wallLeftTex'; // (1,3)
             }
 
             let wall = dungeonWalls.create(px, py, wallKey);
