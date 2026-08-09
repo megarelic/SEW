@@ -148,7 +148,7 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.0</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.1</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -213,7 +213,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.3.0';
+    const GAME_VERSION = 'v1.3.1';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
@@ -502,6 +502,12 @@
     let dungeonCorpses = [];
     let minimapGfx;
 
+    // Vine System Variables
+    let dungeonVines = [];
+    let vineTips = [];
+    let vineEvent = null;
+    const MAX_VINE_SEGMENTS = 35;
+
     let currentSoilState = 'EMPTY';
     let dungeonGrid = [];
     let lastDamageTime = 0;
@@ -546,6 +552,12 @@
       soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
+
+      // Vine Texture
+      const vineGfx = scene.make.graphics({ add: false });
+      vineGfx.fillStyle(0x15803d, 1).fillCircle(16, 16, 10);
+      vineGfx.fillStyle(0x22c55e, 1).fillCircle(16, 16, 5);
+      vineGfx.generateTexture('vineTex', 32, 32);
 
       const playerGfx = scene.make.graphics({ add: false });
       playerGfx.fillStyle(0x38bdf8, 1).fillCircle(16, 16, 10);
@@ -715,31 +727,86 @@
       if (player.body) player.body.reset(spawnX, spawnY);
       scene.cameras.main.centerOn(spawnX, spawnY);
 
+      // --- VINE SYSTEM INITIALIZATION ---
+      dungeonVines = [];
+      vineTips = [];
       let lastRoom = rooms[rooms.length - 1];
-      exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex').setDepth(1);
+      let vineStartX = lastRoom.cx;
+      let vineStartY = lastRoom.cy;
+
+      dungeonVines.push(`${vineStartX},${vineStartY}`);
+      vineTips.push({ x: vineStartX, y: vineStartY });
+
+      // Slow Spreading Vine Loop
+      vineEvent = scene.time.addEvent({
+        delay: 1200,
+        loop: true,
+        callback: () => {
+          if (currentZone !== 'DUNGEON' || isInventoryOpen || isShopOpen || isLootOpen) return;
+
+          if (vineTips.length === 0 || dungeonVines.length >= MAX_VINE_SEGMENTS) {
+            if (!exitDoor && vineTips.length > 0) {
+              let finalTip = vineTips[vineTips.length - 1];
+              exitDoor = scene.physics.add.sprite(finalTip.x * TILE_SIZE + TILE_SIZE/2, finalTip.y * TILE_SIZE + TILE_SIZE/2, 'exitDoorTex').setDepth(1);
+              document.getElementById('dialogue-box').innerText = "The dungeon vine has fully matured and spawned the Exit Door!";
+            }
+            return;
+          }
+
+          let tipIdx = Phaser.Math.Between(0, vineTips.length - 1);
+          let tip = vineTips[tipIdx];
+          const dirs = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
+          Phaser.Utils.Array.Shuffle(dirs);
+
+          let grown = false;
+          for (let d of dirs) {
+            let nx = tip.x + d.x;
+            let ny = tip.y + d.y;
+            let key = `${nx},${ny}`;
+
+            if (nx > 0 && nx < MAP_GRID_SIZE - 1 && ny > 0 && ny < MAP_GRID_SIZE - 1) {
+              if (dungeonGrid[ny][nx] === 0 && !dungeonVines.includes(key)) {
+                dungeonVines.push(key);
+                vineTips.push({ x: nx, y: ny });
+
+                let px = nx * TILE_SIZE + TILE_SIZE/2;
+                let py = ny * TILE_SIZE + TILE_SIZE/2;
+                let vSprite = scene.add.image(px, py, 'vineTex').setDepth(1);
+                dungeonFloorTiles.push(vSprite);
+
+                // 20% chance vine buds into a mini enemy
+                if (Math.random() < 0.20) {
+                  let enemy = scene.physics.add.sprite(px, py, 'enemyTex').setDepth(2);
+                  enemy.maxHp = 30;
+                  enemy.hp = 30;
+                  enemy.body.setSize(20, 20);
+                  enemy.hpBar = scene.add.graphics().setDepth(3);
+                  updateEnemyHpBar(enemy);
+                  scene.physics.add.collider(enemy, dungeonWalls);
+                  dungeonEnemies.push(enemy);
+                }
+
+                grown = true;
+                break;
+              }
+            }
+          }
+          if (!grown) {
+            vineTips.splice(tipIdx, 1);
+          }
+        }
+      });
 
       for (let i = 1; i < rooms.length - 1; i++) {
         let rm = rooms[i];
-        
         if (Math.random() > 0.5) {
           let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'soilTex').setDepth(1);
           sTile.state = 'EMPTY';
           dungeonSoilList.push(sTile);
         }
-
-        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex').setDepth(2);
-        enemy.maxHp = 40;
-        enemy.hp = 40;
-        enemy.body.setSize(20, 20);
-
-        enemy.hpBar = scene.add.graphics().setDepth(3);
-        updateEnemyHpBar(enemy);
-
-        scene.physics.add.collider(enemy, dungeonWalls);
-        dungeonEnemies.push(enemy);
       }
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Layer Entered! Explore rooms, slay mobs, and find the Green Exit Door.";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Watch the glowing vines spread to spawn enemies and the Exit Door!";
       updateUI();
     }
 
@@ -771,6 +838,7 @@
     }
 
     function clearDungeon(scene) {
+      if (vineEvent) { vineEvent.remove(); vineEvent = null; }
       if (exitDoor) { exitDoor.destroy(); exitDoor = null; }
       if (dungeonWalls) dungeonWalls.clear(true, true);
       dungeonFloorTiles.forEach(t => t.destroy());
@@ -863,10 +931,14 @@
           }
         }
 
-        const distExit = Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y);
-        if (distExit <= 65) {
-          buildHubMap(scene);
-          return;
+        if (exitDoor) {
+          const distExit = Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y);
+          if (distExit <= 65) {
+            buildHubMap(scene);
+            return;
+          }
+        } else {
+          dialogue.innerText = "The Exit Door has not sprouted yet! Wait for the vines to grow.";
         }
       }
     }
