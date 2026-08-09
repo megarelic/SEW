@@ -82,13 +82,30 @@
       top: 30px; left: 30px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
     }
 
-    .action-btn {
-      width: 65px; height: 65px; border-radius: 50%;
-      background: rgba(34, 197, 94, 0.4); border: 3px solid rgba(34, 197, 94, 0.8);
-      color: #fff; font-size: 22px; font-weight: bold; display: flex;
-      align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(4px);
+    .right-buttons {
+      display: flex; gap: 12px; pointer-events: none; align-items: center;
     }
-    .action-btn:active { background: rgba(34, 197, 94, 0.8); transform: scale(0.95); }
+
+    .action-btn {
+      width: 60px; height: 60px; border-radius: 50%;
+      color: #fff; font-size: 18px; font-weight: bold; display: flex;
+      align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(4px);
+      position: relative; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    #btn-action { background: rgba(34, 197, 94, 0.5); border: 3px solid rgba(34, 197, 94, 0.9); }
+    #btn-action:active { background: rgba(34, 197, 94, 0.9); transform: scale(0.95); }
+
+    #btn-loot { background: rgba(234, 179, 8, 0.5); border: 3px solid rgba(234, 179, 8, 0.9); font-size: 14px; }
+    #btn-loot:active { background: rgba(234, 179, 8, 0.9); transform: scale(0.95); }
+
+    #btn-plant { background: rgba(168, 85, 247, 0.5); border: 3px solid rgba(168, 85, 247, 0.9); font-size: 14px; }
+    #btn-plant:active { transform: scale(0.95); }
+
+    /* Hold Progress Ring for Plant Button */
+    #plant-progress {
+      position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
+      background: rgba(255, 255, 255, 0.4); transition: height 0.05s linear; pointer-events: none;
+    }
 
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0;
@@ -147,15 +164,19 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.0</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.1</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Walk up to the Dungeon Door, Soil, or Merchant and press [A]!</div>
+  <div id="dialogue-box">Surface Hub: Use [A] to Attack, [P] to Plant/Harvest, [L] to Loot!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
-    <div class="action-btn" id="btn-action">A</div>
+    <div class="right-buttons">
+      <div class="action-btn" id="btn-loot">📦 L</div>
+      <div class="action-btn" id="btn-plant">🌱 P<div id="plant-progress"></div></div>
+      <div class="action-btn" id="btn-action">⚔️ A</div>
+    </div>
   </div>
 
   <!-- Inventory Modal -->
@@ -216,7 +237,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.0';
+    const GAME_VERSION = 'v1.4.1';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -526,7 +547,122 @@
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE ---
+    // --- 4. HOLD-TO-PLANT LOGIC ---
+    let plantHoldTimer = null;
+    let plantStartTime = 0;
+    const plantProgressBar = document.getElementById('plant-progress');
+    const plantBtn = document.getElementById('btn-plant');
+
+    plantBtn.addEventListener('pointerdown', (e) => {
+      if (isInventoryOpen || isShopOpen || isLootOpen) return;
+      e.preventDefault();
+      plantStartTime = Date.now();
+      plantProgressBar.style.height = '0%';
+
+      // Check if standing near soil for harvest (immediate) vs planting (hold)
+      const scene = game.scene.scenes[0];
+      if (!scene) return;
+
+      let targetSoil = null;
+      if (currentZone === 'HUB' && hubSoil) {
+        if (Phaser.Math.Distance.Between(player.x, player.y, hubSoil.x, hubSoil.y) <= 65) targetSoil = hubSoil;
+      } else if (currentZone === 'DUNGEON') {
+        for (let s of dungeonSoilList) {
+          if (Phaser.Math.Distance.Between(player.x, player.y, s.x, s.y) <= 60) {
+            targetSoil = s;
+            break;
+          }
+        }
+      }
+
+      if (targetSoil && targetSoil.state === 'READY') {
+        // Immediate harvest on tap if ready
+        handleSoilAction(scene, targetSoil);
+        return;
+      }
+
+      // Otherwise start 3-second hold timer for planting
+      plantHoldTimer = setInterval(() => {
+        let elapsed = Date.now() - plantStartTime;
+        let pct = Math.min(100, (elapsed / 3000) * 100);
+        plantProgressBar.style.height = pct + '%';
+
+        if (elapsed >= 3000) {
+          clearInterval(plantHoldTimer);
+          plantHoldTimer = null;
+          plantProgressBar.style.height = '0%';
+          completePlanting(scene);
+        }
+      }, 50);
+    });
+
+    const cancelPlant = () => {
+      if (plantHoldTimer) {
+        clearInterval(plantHoldTimer);
+        plantHoldTimer = null;
+        plantProgressBar.style.height = '0%';
+        document.getElementById('dialogue-box').innerText = "Planting cancelled (held for less than 3 seconds).";
+      }
+    };
+    plantBtn.addEventListener('pointerup', cancelPlant);
+    plantBtn.addEventListener('pointerleave', cancelPlant);
+    plantBtn.addEventListener('pointercancel', cancelPlant);
+
+    function completePlanting(scene) {
+      const dialogue = document.getElementById('dialogue-box');
+      let targetSoil = null;
+      if (currentZone === 'HUB' && hubSoil) {
+        if (Phaser.Math.Distance.Between(player.x, player.y, hubSoil.x, hubSoil.y) <= 65) targetSoil = hubSoil;
+      } else if (currentZone === 'DUNGEON') {
+        for (let s of dungeonSoilList) {
+          if (Phaser.Math.Distance.Between(player.x, player.y, s.x, s.y) <= 60) {
+            targetSoil = s;
+            break;
+          }
+        }
+      }
+
+      if (!targetSoil) {
+        dialogue.innerText = "You are not standing near any soil plot!";
+        return;
+      }
+
+      if (targetSoil.state === 'EMPTY') {
+        let swordSeeds = getPlayerItemCount('Sword Seed');
+        let bowSeeds = getPlayerItemCount('Bow Seed');
+
+        if (swordSeeds > 0 || bowSeeds > 0) {
+          let chosenSeed = swordSeeds > 0 ? 'Sword Seed' : 'Bow Seed';
+          removePlayerItem(chosenSeed, 1);
+          targetSoil.seedType = chosenSeed;
+          targetSoil.state = 'GROWING';
+          targetSoil.setTint(0xeab308);
+          dialogue.innerText = `Planted a ${chosenSeed} after 3s hold! Maturing in 3 seconds...`;
+          
+          scene.time.delayedCall(3000, () => {
+            targetSoil.state = 'READY';
+            targetSoil.setTint(0x22c55e);
+            dialogue.innerText = `The ${chosenSeed} crop is fully grown! Press [P] to harvest!`;
+          });
+        } else { dialogue.innerText = "You have no seeds left! Visit the Merchant to buy more."; }
+      } else if (targetSoil.state === 'GROWING') {
+        dialogue.innerText = "This soil already has a crop growing!";
+      }
+    }
+
+    function handleSoilAction(scene, soilObj) {
+      const dialogue = document.getElementById('dialogue-box');
+      if (soilObj.state === 'READY') {
+        soilObj.state = 'EMPTY';
+        soilObj.clearTint();
+        let reward = soilObj.seedType === 'Bow Seed' ? 'Hunting Bow' : 'Iron Sword';
+        addPlayerItem(reward, 1);
+        addPlayerItem('Gold', 15);
+        dialogue.innerText = `Harvested a ${reward} & 15 Gold added to inventory!`;
+      }
+    }
+
+    // --- 5. PHASER 3 ENGINE ---
     let player, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
@@ -663,9 +799,16 @@
 
       cursors = scene.input.keyboard.createCursorKeys();
 
+      // Combat Action Button [A]
       document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        handleInteraction(scene);
+        handleCombatAction(scene);
+      });
+
+      // Dedicated Loot Button [L]
+      document.getElementById('btn-loot').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handleLootAction(scene);
       });
 
       updateUI();
@@ -694,7 +837,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Equip a Sword or Bow, walk up to Dungeon Door, and press [A]!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Use [A] to Attack, [P] to Plant, [L] to Loot!";
       updateUI();
     }
 
@@ -835,7 +978,6 @@
 
       vinePathNodes = shortestPath || [{ x: startNode.x, y: startNode.y }, { x: targetNode.x, y: targetNode.y }];
 
-      // Generate random offshoots branching off main path nodes
       vinePathNodes.forEach((node, idx) => {
         if (idx > 0 && idx < vinePathNodes.length - 1 && Math.random() < 0.25) {
           let dirs = [{x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}];
@@ -850,7 +992,6 @@
         }
       });
 
-      // Target ~60 seconds (60000ms) total growth time across all nodes
       let calculatedDelay = Math.max(80, Math.floor(60000 / Math.max(1, vinePathNodes.length)));
 
       vineEvent = scene.time.addEvent({
@@ -871,7 +1012,6 @@
           vineGraphics.clear();
           vineCurrentIndex++;
 
-          // Draw main tapered vine path
           for (let i = 0; i < vineCurrentIndex; i++) {
             let p1 = vinePathNodes[i];
             let p2 = vinePathNodes[i + 1];
@@ -886,7 +1026,6 @@
             vineGraphics.strokePath();
           }
 
-          // Draw offshoots if their parent index has been reached
           vineOffshoots.forEach(off => {
             if (off.parentIndex <= vineCurrentIndex) {
               vineGraphics.lineStyle(1.5, 0x15803d, 0.8);
@@ -899,7 +1038,7 @@
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The vine creeps slowly over 1 minute toward the exit!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Explore and use dedicated [A], [P], and [L] buttons!";
       updateUI();
     }
 
@@ -953,7 +1092,7 @@
       minimapGfx.clear();
     }
 
-    function handleInteraction(scene) {
+    function handleCombatAction(scene) {
       if (isInventoryOpen || isShopOpen || isLootOpen) return;
       const dialogue = document.getElementById('dialogue-box');
 
@@ -962,7 +1101,6 @@
         arrowProj.setRotation(player.rotation);
         arrowProj.setVisible(true);
         scene.physics.velocityFromRotation(player.rotation, 500, arrowProj.body.velocity);
-
         dialogue.innerText = "Fired an arrow!";
       } else {
         playAttackAnimation(scene);
@@ -971,31 +1109,17 @@
       if (currentZone === 'HUB') {
         const distDoor = Phaser.Math.Distance.Between(player.x, player.y, dungeonDoor.x, dungeonDoor.y);
         const distMerchant = Phaser.Math.Distance.Between(player.x, player.y, merchant.x, merchant.y);
-        const distSoil = Phaser.Math.Distance.Between(player.x, player.y, hubSoil.x, hubSoil.y);
 
         if (distDoor <= 65) {
           generateDungeon(scene);
           return;
         }
-
         if (distMerchant <= 75) {
           dialogue.innerText = "Welcome to the Merchant Shop!";
           toggleShop(true);
           return;
         }
-
-        if (distSoil <= 65) {
-          handleSoilInteraction(scene, hubSoil, dialogue);
-          return;
-        }
       } else if (currentZone === 'DUNGEON') {
-        for (let corpse of dungeonCorpses) {
-          if (Phaser.Math.Distance.Between(player.x, player.y, corpse.x, corpse.y) <= 50) {
-            openLootModal(corpse);
-            return;
-          }
-        }
-
         if (playerData.equipped !== 'Hunting Bow') {
           for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
             let mob = dungeonEnemies[i];
@@ -1020,19 +1144,12 @@
                 ];
                 dungeonCorpses.push(corpse);
 
-                dialogue.innerText = "Enemy slain! Press [A] over corpse to open loot window.";
+                dialogue.innerText = "Enemy slain! Use [L] button near corpse to loot.";
                 mob.destroy();
                 dungeonEnemies.splice(i, 1);
               }
               return;
             }
-          }
-        }
-
-        for (let dSoil of dungeonSoilList) {
-          if (Phaser.Math.Distance.Between(player.x, player.y, dSoil.x, dSoil.y) <= 60) {
-            handleSoilInteraction(scene, dSoil, dialogue);
-            return;
           }
         }
 
@@ -1042,9 +1159,22 @@
             buildHubMap(scene);
             return;
           }
-        } else {
-          dialogue.innerText = "The Exit Door has not sprouted yet! Wait for the vine to finish growing.";
         }
+      }
+    }
+
+    function handleLootAction(scene) {
+      if (isInventoryOpen || isShopOpen || isLootOpen) return;
+      const dialogue = document.getElementById('dialogue-box');
+
+      if (currentZone === 'DUNGEON') {
+        for (let corpse of dungeonCorpses) {
+          if (Phaser.Math.Distance.Between(player.x, player.y, corpse.x, corpse.y) <= 60) {
+            openLootModal(corpse);
+            return;
+          }
+        }
+        dialogue.innerText = "No corpse nearby to loot!";
       }
     }
 
@@ -1060,35 +1190,6 @@
       scene.time.delayedCall(150, () => {
         swordSlash.setVisible(false);
       });
-    }
-
-    function handleSoilInteraction(scene, soilObj, dialogue) {
-      if (soilObj.state === 'EMPTY') {
-        let swordSeeds = getPlayerItemCount('Sword Seed');
-        let bowSeeds = getPlayerItemCount('Bow Seed');
-
-        if (swordSeeds > 0 || bowSeeds > 0) {
-          let chosenSeed = swordSeeds > 0 ? 'Sword Seed' : 'Bow Seed';
-          removePlayerItem(chosenSeed, 1);
-          soilObj.seedType = chosenSeed;
-          soilObj.state = 'GROWING';
-          soilObj.setTint(0xeab308);
-          dialogue.innerText = `Planted a ${chosenSeed}! Maturing in 3 seconds...`;
-          
-          scene.time.delayedCall(3000, () => {
-            soilObj.state = 'READY';
-            soilObj.setTint(0x22c55e);
-            dialogue.innerText = `The ${chosenSeed} crop is fully grown! Press [A] to harvest!`;
-          });
-        } else { dialogue.innerText = "You have no seeds left! Visit the Merchant to buy more."; }
-      } else if (soilObj.state === 'READY') {
-        soilObj.state = 'EMPTY';
-        soilObj.clearTint();
-        let reward = soilObj.seedType === 'Bow Seed' ? 'Hunting Bow' : 'Iron Sword';
-        addPlayerItem(reward, 1);
-        addPlayerItem('Gold', 15);
-        dialogue.innerText = `Harvested a ${reward} & 15 Gold added to inventory!`;
-      }
     }
 
     function update(time, delta) {
