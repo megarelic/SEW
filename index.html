@@ -106,7 +106,7 @@
       display: flex; justify-content: space-between; align-items: center;
       border-bottom: 1px solid #334155; padding-bottom: 8px;
     }
-    .modal-header h2 { font-size: 15px; color: #38bdf8; }
+    .modal-header h2 { font-size: 14px; color: #38bdf8; }
     .close-btn {
       background: #ef4444; border: none; color: #fff; font-weight: bold;
       padding: 4px 10px; border-radius: 6px; cursor: pointer;
@@ -114,12 +114,17 @@
 
     .inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 200px; overflow-y: auto; padding-right: 4px; }
     .inv-slot {
+      position: relative;
       aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-size: 8px; text-align: center; padding: 2px; color: #cbd5e1; cursor: pointer; line-height: 1.1;
     }
     .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
     .inv-slot.equipped { border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.2); }
+    .drop-slot-btn {
+      position: absolute; top: 2px; right: 2px; background: #ef4444; color: #fff;
+      border: none; font-size: 7px; padding: 2px 4px; border-radius: 4px; cursor: pointer;
+    }
 
     .loot-container {
       display: flex; gap: 12px; justify-content: space-between;
@@ -148,11 +153,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.6</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.7</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Kenney 16x16 Tilemap with 1px gap loaded successfully!</div>
+  <div id="dialogue-box">Surface Hub: You can now drop items on the ground from your inventory!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -163,7 +168,7 @@
   <div id="inventory-modal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>🎒 Stash & Inventory (Double-Tap to Equip)</h2>
+        <h2>🎒 Stash & Inventory (Double-Tap Equips, Use 'Drop' to Drop)</h2>
         <button class="close-btn" id="btn-close-inv">✕</button>
       </div>
       <div class="inv-grid" id="inv-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 220px;"></div>
@@ -217,7 +222,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.6';
+    const GAME_VERSION = 'v1.4.7';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -345,6 +350,16 @@
             else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
             else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
 
+            // Add drop button to slot
+            const dropBtn = document.createElement('button');
+            dropBtn.className = 'drop-slot-btn';
+            dropBtn.innerText = 'Drop';
+            dropBtn.addEventListener('pointerdown', (e) => {
+              e.stopPropagation();
+              dropItemToGround(i);
+            });
+            slot.appendChild(dropBtn);
+
             let lastTap = 0;
             slot.addEventListener('pointerdown', (e) => {
               let currentTime = new Date().getTime();
@@ -361,6 +376,25 @@
           }
           invGrid.appendChild(slot);
         }
+      }
+    }
+
+    function dropItemToGround(index) {
+      let item = playerData.inventory[index];
+      if (!item) return;
+
+      const scene = game.scene.scenes[0];
+      if (scene && player) {
+        // Spawn world ground drop item
+        let groundItem = scene.physics.add.sprite(player.x + Phaser.Math.Between(-15, 15), player.y + Phaser.Math.Between(-15, 15), 'tiles', 130);
+        groundItem.setScale(1.5);
+        groundItem.setDepth(1);
+        groundItem.itemData = JSON.parse(JSON.stringify(item));
+        worldGroundDrops.push(groundItem);
+
+        removePlayerItemAtIndex(index, item.count || 1);
+        toggleInventory(true);
+        document.getElementById('dialogue-box').innerText = `Dropped ${item.quality || ''} ${item.name || item.type} onto the ground!`;
       }
     }
 
@@ -557,12 +591,13 @@
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & KENNEY TILEMAP LOADER (16x16 with 1px gap) ---
+    // --- 4. PHASER 3 ENGINE & WORLD DROPS ---
     let player, aimReticle, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
     let dungeonEnemies = [];
     let dungeonCorpses = [];
+    let worldGroundDrops = [];
     let minimapGfx;
 
     let vinePathNodes = [];
@@ -576,13 +611,13 @@
     let aimAngle = 0;
 
     const SPEED = 150;
-    const TILE_SIZE = 32; // Render scale
+    const TILE_SIZE = 32;
     const MAP_GRID_SIZE = 40;
     const WORLD_SIZE = MAP_GRID_SIZE * TILE_SIZE;
 
     const config = {
       type: Phaser.AUTO,
-      width: window.innerWidth,
+      width: window.innerHeight > window.innerWidth ? window.innerWidth : window.innerWidth,
       height: window.innerHeight,
       pixelArt: true,
       scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
@@ -594,7 +629,6 @@
 
     function preload() {
       const scene = this;
-      // Load 16x16 tilemap with 1px margin and 1px spacing
       scene.load.spritesheet('tiles', 'https://raw.githubusercontent.com/megarelic/SEW/refs/heads/main/tilemap.png', {
         frameWidth: 16,
         frameHeight: 16,
@@ -620,9 +654,8 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      // Player sprite using Kenney tile index (e.g., frame 113 for player character in row 8)
       player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'tiles', 113);
-      player.setScale(2); // Scale 16x16 up to 32x32 world size
+      player.setScale(2);
       player.setCollideWorldBounds(true);
       player.setDepth(10);
       player.body.setSize(14, 14).setOffset(1, 1);
@@ -669,6 +702,26 @@
         let worldPoint = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
         const dialogue = document.getElementById('dialogue-box');
 
+        // Check World Ground Drop Pickup
+        for (let i = worldGroundDrops.length - 1; i >= 0; i--) {
+          let drop = worldGroundDrops[i];
+          if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, drop.x, drop.y) <= 24) {
+            if (Phaser.Math.Distance.Between(player.x, player.y, drop.x, drop.y) <= 55) {
+              let success = addPlayerItem(drop.itemData);
+              if (success) {
+                dialogue.innerText = `Picked up dropped item!`;
+                drop.destroy();
+                worldGroundDrops.splice(i, 1);
+              } else {
+                dialogue.innerText = "Inventory is full!";
+              }
+            } else {
+              dialogue.innerText = "Walk closer to pick up this item!";
+            }
+            return;
+          }
+        }
+
         for (let mob of dungeonEnemies) {
           if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, mob.x, mob.y) <= 24) {
             mob.showHp = true;
@@ -695,7 +748,8 @@
           if (targetSoil.state === 'READY') {
             if (distToPlayer <= 60) {
               targetSoil.state = 'EMPTY';
-              targetSoil.setFrame(36); // Ground tile
+              targetSoil.clearTint();
+              targetSoil.setFrame(35);
               let harvestedWeapon = generateUniqueWeapon(targetSoil.seedType === 'Bow Seed' ? 'bow' : 'sword');
               addPlayerItem(harvestedWeapon);
               addPlayerItem({ name: 'Gold', count: 15 });
@@ -815,7 +869,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Kenney Tilemap active!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Drop items on ground via Inventory [Drop] button!";
       updateUI();
     }
 
@@ -1072,6 +1126,9 @@
       dungeonCorpses.forEach(c => c.destroy());
       dungeonCorpses = [];
 
+      worldGroundDrops.forEach(d => d.destroy());
+      worldGroundDrops = [];
+
       minimapGfx.clear();
     }
 
@@ -1092,7 +1149,7 @@
           scene.time.delayedCall(3000, () => {
             targetSoil.state = 'READY';
             targetSoil.clearTint();
-            targetSoil.setFrame(34); // Mature crop tile
+            targetSoil.setFrame(34);
             dialogue.innerText = `The ${chosenSeed} crop is fully grown! Click to harvest!`;
           });
         } else { dialogue.innerText = "You have no seeds left! Visit Merchant to buy more."; }
