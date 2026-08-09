@@ -153,11 +153,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.8</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.9</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Player at (0,7), Enemy at (0,9) mapped successfully!</div>
+  <div id="dialogue-box">Surface Hub: Precise Tile Extraction (Player at 0,7, Enemy at 0,9) Active!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -222,7 +222,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.8';
+    const GAME_VERSION = 'v1.4.9';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -255,13 +255,6 @@
     let activeCorpseLoot = null;
     let currentZone = 'HUB';
     const MAX_INVENTORY_SLOTS = 16;
-
-    // Tilemap layout: 16x16 grid columns. Let's assume standard 16 columns wide based on visual tilemap
-    const TILEMAP_COLUMNS = 16;
-    // Player at (0, 7) -> row 7, col 0 => index = 7 * 16 + 0 = 112
-    const TILE_PLAYER = 7 * TILEMAP_COLUMNS + 0;
-    // Enemy at (0, 9) -> row 9, col 0 => index = 9 * 16 + 0 = 144
-    const TILE_ENEMY = 9 * TILEMAP_COLUMNS + 0;
 
     function getPlayerItemCount(itemName) {
       let total = 0;
@@ -391,7 +384,7 @@
 
       const scene = game.scene.scenes[0];
       if (scene && player) {
-        let groundItem = scene.physics.add.sprite(player.x + Phaser.Math.Between(-15, 15), player.y + Phaser.Math.Between(-15, 15), 'tiles', 130);
+        let groundItem = scene.physics.add.sprite(player.x + Phaser.Math.Between(-15, 15), player.y + Phaser.Math.Between(-15, 15), 'dropTex');
         groundItem.setScale(1.5);
         groundItem.setDepth(1);
         groundItem.itemData = JSON.parse(JSON.stringify(item));
@@ -596,7 +589,7 @@
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & MAP SPRITES ---
+    // --- 4. PHASER 3 ENGINE & CANVAS TILE EXTRACTION ---
     let player, aimReticle, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
@@ -634,17 +627,38 @@
 
     function preload() {
       const scene = this;
-      scene.load.spritesheet('tiles', 'https://raw.githubusercontent.com/megarelic/SEW/refs/heads/main/tilemap.png', {
-        frameWidth: 16,
-        frameHeight: 16,
-        margin: 1,
-        spacing: 1
-      });
+      scene.load.image('tiles_raw', 'https://raw.githubusercontent.com/megarelic/SEW/refs/heads/main/tilemap.png');
+    }
+
+    function extractTileTexture(scene, key, col, row) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext('2d');
+      const img = scene.textures.get('tiles_raw').getSourceImage();
+      // 1px margin and 1px spacing math: x = 1 + col * 17, y = 1 + row * 17
+      const x = 1 + col * 17;
+      const y = 1 + row * 17;
+      ctx.drawImage(img, x, y, 16, 16, 0, 0, 16, 16);
+      scene.textures.addCanvas(key, canvas);
     }
 
     function create() {
       const scene = this;
       scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
+
+      // Extract custom exact textures from the 16x16 tilemap with 1px gap
+      extractTileTexture(scene, 'playerTex', 0, 7);   // Player at (0,7)
+      extractTileTexture(scene, 'enemyTex', 0, 9);    // Enemy at (0,9)
+      extractTileTexture(scene, 'hubFloorTex', 0, 4); // Hub ground
+      extractTileTexture(scene, 'dungFloorTex', 1, 4);// Dungeon ground
+      extractTileTexture(scene, 'wallTex', 2, 2);     // Wall
+      extractTileTexture(scene, 'soilTex', 2, 5);     // Soil plot
+      extractTileTexture(scene, 'merchantTex', 1, 7); // Merchant NPC
+      extractTileTexture(scene, 'doorTex', 6, 0);     // Dungeon Door
+      extractTileTexture(scene, 'exitTex', 7, 0);     // Exit Door
+      extractTileTexture(scene, 'corpseTex', 3, 6);   // Corpse
+      extractTileTexture(scene, 'dropTex', 4, 5);     // Ground Drop
 
       const slashGfx = scene.make.graphics({ add: false });
       slashGfx.fillStyle(0x38bdf8, 0.7);
@@ -659,8 +673,7 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      // Player sprite at (0,7)
-      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'tiles', TILE_PLAYER);
+      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
       player.setScale(2);
       player.setCollideWorldBounds(true);
       player.setDepth(10);
@@ -754,7 +767,6 @@
             if (distToPlayer <= 60) {
               targetSoil.state = 'EMPTY';
               targetSoil.clearTint();
-              targetSoil.setFrame(35);
               let harvestedWeapon = generateUniqueWeapon(targetSoil.seedType === 'Bow Seed' ? 'bow' : 'sword');
               addPlayerItem(harvestedWeapon);
               addPlayerItem({ name: 'Gold', count: 15 });
@@ -852,20 +864,20 @@
 
       for (let x = 0; x < WORLD_SIZE; x += 32) {
         for (let y = 0; y < WORLD_SIZE; y += 32) {
-          const tile = scene.add.image(x + 16, y + 16, 'tiles', 36).setDisplaySize(32, 32).setDepth(0);
+          const tile = scene.add.image(x + 16, y + 16, 'hubFloorTex').setDisplaySize(32, 32).setDepth(0);
           dungeonFloorTiles.push(tile);
         }
       }
 
-      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'tiles', 35);
+      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'soilTex');
       hubSoil.setScale(2);
       hubSoil.state = 'EMPTY';
 
-      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'tiles', 114);
+      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'merchantTex');
       merchant.setScale(2);
       merchant.setImmovable(true);
       
-      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'tiles', 14);
+      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'doorTex');
       dungeonDoor.setScale(2);
 
       if (player) {
@@ -874,7 +886,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Player at (0,7), Enemy at (0,9) active!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Player sprite extracted from (0,7)!";
       updateUI();
     }
 
@@ -927,10 +939,10 @@
           let py = y * TILE_SIZE + TILE_SIZE / 2;
 
           if (dungeonGrid[y][x] === 0) {
-            const floorTile = scene.add.image(px, py, 'tiles', 37).setDisplaySize(32, 32).setDepth(0);
+            const floorTile = scene.add.image(px, py, 'dungFloorTex').setDisplaySize(32, 32).setDepth(0);
             dungeonFloorTiles.push(floorTile);
           } else {
-            let wall = dungeonWalls.create(px, py, 'tiles', 32);
+            let wall = dungeonWalls.create(px, py, 'wallTex');
             wall.setScale(2);
             wall.refreshBody();
           }
@@ -960,8 +972,7 @@
         let rm = rooms[i];
         if (rm === startRoom) continue;
 
-        // Enemy sprite at (0,9)
-        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'tiles', TILE_ENEMY);
+        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex');
         enemy.setScale(2);
         enemy.maxHp = 40;
         enemy.hp = 40;
@@ -973,7 +984,7 @@
         dungeonEnemies.push(enemy);
 
         if (Math.random() > 0.5) {
-          let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'tiles', 35);
+          let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'soilTex');
           sTile.setScale(2);
           sTile.state = 'EMPTY';
           dungeonSoilList.push(sTile);
@@ -1044,7 +1055,7 @@
           if (vineCurrentIndex >= vinePathNodes.length - 1) {
             if (!exitDoor) {
               let finalNode = vinePathNodes[vinePathNodes.length - 1];
-              exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'tiles', 15);
+              exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'exitTex');
               exitDoor.setScale(2);
               exitDoor.setDepth(1);
               document.getElementById('dialogue-box').innerText = "The vine reached the far room and blossomed into the Exit Door!";
@@ -1155,7 +1166,6 @@
           scene.time.delayedCall(3000, () => {
             targetSoil.state = 'READY';
             targetSoil.clearTint();
-            targetSoil.setFrame(34);
             dialogue.innerText = `The ${chosenSeed} crop is fully grown! Click to harvest!`;
           });
         } else { dialogue.innerText = "You have no seeds left! Visit Merchant to buy more."; }
@@ -1195,7 +1205,7 @@
 
               if (mob.hp <= 0) {
                 if (mob.hpBar) mob.hpBar.destroy();
-                let corpse = scene.physics.add.sprite(mob.x, mob.y, 'tiles', 129);
+                let corpse = scene.physics.add.sprite(mob.x, mob.y, 'corpseTex');
                 corpse.setScale(2);
                 corpse.setDepth(1);
                 
@@ -1288,7 +1298,7 @@
 
             if (mob.hp <= 0) {
               if (mob.hpBar) mob.hpBar.destroy();
-              let corpse = game.scene.scenes[0].physics.add.sprite(mob.x, mob.y, 'tiles', 129);
+              let corpse = game.scene.scenes[0].physics.add.sprite(mob.x, mob.y, 'corpseTex');
               corpse.setScale(2);
               corpse.setDepth(1);
               corpse.items = [
