@@ -30,7 +30,6 @@
     }
     canvas { display: block; }
 
-    /* Rotate Phone Warning */
     #rotate-screen {
       display: none; position: fixed; top: 0; left: 0;
       width: 100vw; height: 100vh; height: 100dvh;
@@ -41,7 +40,6 @@
     #rotate-screen span { font-size: 48px; margin-bottom: 12px; }
     @media (orientation: portrait) { #rotate-screen { display: flex; } }
 
-    /* HUD Bar */
     #hud {
       position: fixed; top: 12px; left: 16px; right: 16px;
       z-index: 10; display: flex; justify-content: space-between; align-items: center;
@@ -60,7 +58,6 @@
     }
     .hud-btn:active { background: rgba(56, 189, 248, 0.6); }
 
-    /* Dialogue Box */
     #dialogue-box {
       position: fixed; top: 48px; left: 15%; right: 15%;
       z-index: 10; background: rgba(15, 23, 42, 0.9);
@@ -68,14 +65,12 @@
       font-size: 12px; color: #e2e8f0; pointer-events: none; text-align: center;
     }
 
-    /* Controls Overlay */
     #controls {
       position: fixed; bottom: 16px; left: 16px; right: 16px;
       height: 110px; z-index: 20; display: flex; justify-content: space-between;
       align-items: center; pointer-events: none;
     }
 
-    /* Virtual Joystick */
     #joystick-zone {
       width: 100px; height: 100px; background: rgba(255, 255, 255, 0.1);
       border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
@@ -87,7 +82,6 @@
       top: 30px; left: 30px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
     }
 
-    /* Action Button "A" */
     .action-btn {
       width: 65px; height: 65px; border-radius: 50%;
       background: rgba(34, 197, 94, 0.4); border: 3px solid rgba(34, 197, 94, 0.8);
@@ -96,7 +90,6 @@
     }
     .action-btn:active { background: rgba(34, 197, 94, 0.8); transform: scale(0.95); }
 
-    /* Modals */
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0;
       width: 100vw; height: 100vh; height: 100dvh;
@@ -104,7 +97,7 @@
       z-index: 50; justify-content: center; align-items: center;
     }
     .modal-card {
-      width: 85%; max-width: 500px; background: #1e293b;
+      width: 88%; max-width: 520px; background: #1e293b;
       border: 2px solid #38bdf8; border-radius: 12px; padding: 16px;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 12px;
     }
@@ -123,9 +116,18 @@
     .inv-slot {
       aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 11px; text-align: center; padding: 4px; color: #cbd5e1;
+      font-size: 11px; text-align: center; padding: 4px; color: #cbd5e1; cursor: grab;
     }
     .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
+    .inv-slot.drag-over { border-color: #22c55e; background: rgba(34, 197, 94, 0.2); }
+
+    .loot-container {
+      display: flex; gap: 16px; justify-content: space-between;
+    }
+    .loot-pane {
+      flex: 1; background: #0f172a; padding: 10px; border-radius: 8px; border: 1px solid #334155;
+    }
+    .loot-pane h3 { font-size: 12px; color: #38bdf8; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
 
     .shop-section { display: flex; flex-direction: column; gap: 8px; }
     .shop-section h3 { font-size: 13px; color: #f1f5f9; border-bottom: 1px dashed #334155; padding-bottom: 4px; }
@@ -171,6 +173,26 @@
     </div>
   </div>
 
+  <!-- NPC Drag and Drop Loot Modal -->
+  <div id="loot-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>💀 Corpse Loot</h2>
+        <button class="close-btn" id="btn-close-loot">✕</button>
+      </div>
+      <div class="loot-container">
+        <div class="loot-pane">
+          <h3>Enemy Loot</h3>
+          <div class="inv-grid" id="loot-npc-grid" style="grid-template-columns: repeat(2, 1fr);"></div>
+        </div>
+        <div class="loot-pane">
+          <h3>Your Inventory</h3>
+          <div class="inv-grid" id="loot-player-grid" style="grid-template-columns: repeat(2, 1fr);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Merchant Shop Modal -->
   <div id="shop-modal" class="modal-overlay">
     <div class="modal-card">
@@ -211,6 +233,8 @@
     let playerData = getPlayerData();
     let isInventoryOpen = false;
     let isShopOpen = false;
+    let isLootOpen = false;
+    let activeCorpseLoot = null;
     let currentZone = 'HUB';
 
     function updateUI() {
@@ -218,9 +242,10 @@
         `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
     }
 
-    // --- 2. MODALS ---
+    // --- 2. MODALS & DRAG/DROP LOOT SYSTEM ---
     const invModal = document.getElementById('inventory-modal');
     const shopModal = document.getElementById('shop-modal');
+    const lootModal = document.getElementById('loot-modal');
     const invGrid = document.getElementById('inv-grid');
     const shopSellList = document.getElementById('shop-sell-list');
 
@@ -271,6 +296,69 @@
       });
     }
 
+    // Drag-and-Drop Loot Modal
+    function openLootModal(corpseObj) {
+      activeCorpseLoot = corpseObj;
+      isLootOpen = true;
+      lootModal.style.display = 'flex';
+      renderLootGrid();
+    }
+
+    function renderLootGrid() {
+      const npcGrid = document.getElementById('loot-npc-grid');
+      const playerGrid = document.getElementById('loot-player-grid');
+      npcGrid.innerHTML = '';
+      playerGrid.innerHTML = '';
+
+      // Render NPC Corpse Slots
+      activeCorpseLoot.items.forEach((item, idx) => {
+        const slot = document.createElement('div');
+        slot.className = 'inv-slot filled';
+        slot.draggable = true;
+        slot.innerHTML = item === 'Gold Pouch' ? '🪙 Gold' : (item === 'Sword Seed' ? '🌰 Seed' : '⚔️ Sword');
+
+        slot.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({ source: 'NPC', index: idx, item: item }));
+        });
+        npcGrid.appendChild(slot);
+      });
+
+      if (activeCorpseLoot.items.length === 0) {
+        npcGrid.innerHTML = '<div style="font-size:10px; color:#64748b; grid-column:span 2;">Empty</div>';
+      }
+
+      // Render Player Slots
+      for (let i = 0; i < 6; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'inv-slot';
+        if (playerData.inventory[i]) {
+          slot.classList.add('filled');
+          slot.innerHTML = `⚔️<br>${playerData.inventory[i]}`;
+        } else {
+          slot.innerText = 'Empty';
+        }
+
+        slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('drag-over'); });
+        slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+        slot.addEventListener('drop', (e) => {
+          e.preventDefault();
+          slot.classList.remove('drag-over');
+          const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+          if (data.source === 'NPC') {
+            // Transfer Item
+            const lootedItem = activeCorpseLoot.items.splice(data.index, 1)[0];
+            if (lootedItem === 'Gold Pouch') playerData.gold += 15;
+            else if (lootedItem === 'Sword Seed') playerData.seeds += 1;
+            else playerData.inventory.push(lootedItem);
+
+            savePlayerData(playerData);
+            renderLootGrid();
+          }
+        });
+        playerGrid.appendChild(slot);
+      }
+    }
+
     document.getElementById('btn-buy-seed').addEventListener('click', () => {
       if (playerData.gold >= 10) {
         playerData.gold -= 10;
@@ -283,18 +371,21 @@
     document.getElementById('btn-bag').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(true); });
     document.getElementById('btn-close-inv').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(false); });
     document.getElementById('btn-close-shop').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleShop(false); });
+    document.getElementById('btn-close-loot').addEventListener('pointerdown', (e) => { e.preventDefault(); isLootOpen = false; lootModal.style.display = 'none'; });
 
-    // --- 3. VIRTUAL JOYSTICK ---
+    // --- 3. VIRTUAL ANALOG JOYSTICK WITH THRESHOLD ---
     let joystickVector = { x: 0, y: 0 };
+    let joystickDistance = 0;
     let joystickActive = false;
     let joystickTouchId = null;
 
     const jZone = document.getElementById('joystick-zone');
     const jKnob = document.getElementById('joystick-knob');
     const maxRadius = 35;
+    const MOVE_THRESHOLD = 12; // Radius threshold before player moves
 
     jZone.addEventListener('touchstart', (e) => {
-      if (isInventoryOpen || isShopOpen) return;
+      if (isInventoryOpen || isShopOpen || isLootOpen) return;
       e.preventDefault();
       const touch = e.changedTouches[0];
       joystickTouchId = touch.identifier;
@@ -319,6 +410,7 @@
           joystickActive = false;
           joystickTouchId = null;
           joystickVector = { x: 0, y: 0 };
+          joystickDistance = 0;
           jKnob.style.transform = `translate(0px, 0px)`;
           break;
         }
@@ -338,17 +430,19 @@
       if (distance > maxRadius) {
         dx = (dx / distance) * maxRadius;
         dy = (dy / distance) * maxRadius;
+        distance = maxRadius;
       }
       jKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      joystickDistance = distance;
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & MAP BUILDER ---
-    let player, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
+    // --- 4. PHASER 3 ENGINE ---
+    let player, swordSlash, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
     let dungeonEnemies = [];
-    let dungeonLootList = [];
+    let dungeonCorpses = [];
     let minimapGfx;
 
     let currentSoilState = 'EMPTY';
@@ -397,21 +491,28 @@
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
+      // Player Sprite with Front Pointer Nose
       const playerGfx = scene.make.graphics({ add: false });
       playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24);
       playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);
-      playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);
+      playerGfx.fillStyle(0xfbebe8, 1).fillRect(20, 10, 8, 12); // Facing Nose
       playerGfx.generateTexture('playerTex', 32, 32);
+
+      // Sword Swing Arc Graphic
+      const slashGfx = scene.make.graphics({ add: false });
+      slashGfx.fillStyle(0x38bdf8, 0.7);
+      slashGfx.slice(24, 24, 30, Phaser.Math.DegToRad(-45), Phaser.Math.DegToRad(45), false);
+      slashGfx.fillPath();
+      slashGfx.generateTexture('slashTex', 48, 48);
 
       const enemyGfx = scene.make.graphics({ add: false });
       enemyGfx.fillStyle(0xef4444, 1).fillRect(4, 4, 24, 24);
       enemyGfx.fillStyle(0xfbbf24, 1).fillRect(8, 8, 16, 8);
       enemyGfx.generateTexture('enemyTex', 32, 32);
 
-      const lootGfx = scene.make.graphics({ add: false });
-      lootGfx.fillStyle(0xf59e0b, 1).fillCircle(12, 12, 10);
-      lootGfx.lineStyle(2, 0xfef08a, 1).strokeCircle(12, 12, 10);
-      lootGfx.generateTexture('lootTex', 24, 24);
+      const corpseGfx = scene.make.graphics({ add: false });
+      corpseGfx.fillStyle(0x475569, 1).fillRect(4, 12, 24, 12);
+      corpseGfx.generateTexture('corpseTex', 32, 32);
 
       const merchantGfx = scene.make.graphics({ add: false });
       merchantGfx.fillStyle(0x8b5cf6, 1).fillRect(4, 0, 24, 12);
@@ -434,17 +535,15 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      // SPAWN HERO
+      // HERO & SWORD SLASH SPRITE
       player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
       player.setCollideWorldBounds(true);
       player.setDepth(10);
-      // Trim bounding box so player never gets stuck in doorways
       player.body.setSize(18, 18).setOffset(7, 7);
 
-      // Minimap Overlay Graphics Component
-      minimapGfx = scene.add.graphics();
-      minimapGfx.setScrollFactor(0);
-      minimapGfx.setDepth(100);
+      swordSlash = scene.add.sprite(0, 0, 'slashTex').setDepth(11).setVisible(false);
+
+      minimapGfx = scene.add.graphics().setScrollFactor(0).setDepth(100);
 
       buildHubMap(scene);
 
@@ -470,15 +569,13 @@
       updateUI();
     }
 
-    // --- HUB OVERWORLD CREATION ---
     function buildHubMap(scene) {
       currentZone = 'HUB';
       clearDungeon(scene);
 
       for (let x = 0; x < WORLD_SIZE; x += 32) {
         for (let y = 0; y < WORLD_SIZE; y += 32) {
-          const tile = scene.add.image(x + 16, y + 16, 'hubTile');
-          tile.setDepth(0);
+          const tile = scene.add.image(x + 16, y + 16, 'hubTile').setDepth(0);
           dungeonFloorTiles.push(tile);
         }
       }
@@ -499,7 +596,6 @@
       updateUI();
     }
 
-    // --- PROCEDURAL DUNGEON GENERATOR ---
     function generateDungeon(scene) {
       currentZone = 'DUNGEON';
       clearHub(scene);
@@ -525,7 +621,6 @@
         }
       }
 
-      // Carve 2-TILE WIDE CORRIDORS to prevent getting stuck
       for (let i = 0; i < rooms.length - 1; i++) {
         let r1 = rooms[i];
         let r2 = rooms[i + 1];
@@ -544,25 +639,21 @@
         }
       }
 
-      // Render Floor & Static Walls
       for (let y = 0; y < MAP_GRID_SIZE; y++) {
         for (let x = 0; x < MAP_GRID_SIZE; x++) {
           let px = x * TILE_SIZE + TILE_SIZE / 2;
           let py = y * TILE_SIZE + TILE_SIZE / 2;
 
           if (dungeonGrid[y][x] === 0) {
-            const floorTile = scene.add.image(px, py, 'dungeonTile');
-            floorTile.setDepth(0);
+            const floorTile = scene.add.image(px, py, 'dungeonTile').setDepth(0);
             dungeonFloorTiles.push(floorTile);
           } else {
-            let wall = dungeonWalls.create(px, py, 'wallTile');
-            wall.setDepth(1);
+            let wall = dungeonWalls.create(px, py, 'wallTile').setDepth(1);
             wall.refreshBody();
           }
         }
       }
 
-      // Spawn Player in Room 0
       let startRoom = rooms[0];
       const spawnX = startRoom.cx * TILE_SIZE;
       const spawnY = startRoom.cy * TILE_SIZE;
@@ -571,31 +662,54 @@
       if (player.body) player.body.reset(spawnX, spawnY);
       scene.cameras.main.centerOn(spawnX, spawnY);
 
-      // Spawn Exit Door in Last Room
       let lastRoom = rooms[rooms.length - 1];
       exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex').setDepth(1);
 
-      // Spawn Dungeon Soil & Enemies in Interior Rooms
+      // Spawn Enemies with Overhead HP Bars
       for (let i = 1; i < rooms.length - 1; i++) {
         let rm = rooms[i];
         
-        // Spawn Soil in 50% of interior rooms
         if (Math.random() > 0.5) {
           let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'soilTex').setDepth(1);
           sTile.state = 'EMPTY';
           dungeonSoilList.push(sTile);
         }
 
-        // Spawn Enemies
         let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex').setDepth(2);
-        enemy.hp = 30;
+        enemy.maxHp = 40;
+        enemy.hp = 40;
         enemy.body.setSize(20, 20);
+
+        // Health Bar Graphic Overlay
+        enemy.hpBar = scene.add.graphics().setDepth(3);
+        updateEnemyHpBar(enemy);
+
         scene.physics.add.collider(enemy, dungeonWalls);
         dungeonEnemies.push(enemy);
       }
 
       document.getElementById('dialogue-box').innerText = "Dungeon Layer Entered! Explore rooms, slay mobs, and find the Green Exit Door.";
       updateUI();
+    }
+
+    function updateEnemyHpBar(enemy) {
+      enemy.hpBar.clear();
+      if (enemy.hp <= 0) return;
+
+      const barW = 28;
+      const barH = 4;
+      const x = enemy.x - barW / 2;
+      const y = enemy.y - 22;
+
+      // Background
+      enemy.hpBar.fillStyle(0x0f172a, 1);
+      enemy.hpBar.fillRect(x, y, barW, barH);
+
+      // Health Fill
+      const fillW = Math.max(0, (enemy.hp / enemy.maxHp) * barW);
+      const color = enemy.hp / enemy.maxHp > 0.4 ? 0x22c55e : 0xef4444;
+      enemy.hpBar.fillStyle(color, 1);
+      enemy.hpBar.fillRect(x, y, fillW, barH);
     }
 
     function clearHub(scene) {
@@ -616,19 +730,25 @@
       dungeonSoilList.forEach(s => s.destroy());
       dungeonSoilList = [];
 
-      dungeonEnemies.forEach(e => e.destroy());
+      dungeonEnemies.forEach(e => {
+        if (e.hpBar) e.hpBar.destroy();
+        e.destroy();
+      });
       dungeonEnemies = [];
 
-      dungeonLootList.forEach(l => l.destroy());
-      dungeonLootList = [];
+      dungeonCorpses.forEach(c => c.destroy());
+      dungeonCorpses = [];
 
       minimapGfx.clear();
     }
 
-    // --- INTERACTION LOGIC ---
+    // --- ATTACK & INTERACTION LOGIC ---
     function handleInteraction(scene) {
-      if (isInventoryOpen || isShopOpen) return;
+      if (isInventoryOpen || isShopOpen || isLootOpen) return;
       const dialogue = document.getElementById('dialogue-box');
+
+      // Trigger Sword Swing Attack Animation
+      playAttackAnimation(scene);
 
       if (currentZone === 'HUB') {
         const distDoor = Phaser.Math.Distance.Between(player.x, player.y, dungeonDoor.x, dungeonDoor.y);
@@ -651,40 +771,36 @@
           return;
         }
       } else if (currentZone === 'DUNGEON') {
-        // 1. Pick up nearby loot
-        for (let i = dungeonLootList.length - 1; i >= 0; i--) {
-          let loot = dungeonLootList[i];
-          if (Phaser.Math.Distance.Between(player.x, player.y, loot.x, loot.y) <= 50) {
-            playerData.gold += loot.rewardGold;
-            playerData.seeds += loot.rewardSeeds;
-            savePlayerData(playerData);
-            dialogue.innerText = `Looted 🪙 ${loot.rewardGold} Gold & 🌰 ${loot.rewardSeeds} Seed!`;
-            loot.destroy();
-            dungeonLootList.splice(i, 1);
+        // 1. Open Loot Screen on Corpse
+        for (let corpse of dungeonCorpses) {
+          if (Phaser.Math.Distance.Between(player.x, player.y, corpse.x, corpse.y) <= 50) {
+            openLootModal(corpse);
             return;
           }
         }
 
-        // 2. Attack nearby enemy
+        // 2. Attack nearby enemy in facing direction
         for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
           let mob = dungeonEnemies[i];
-          if (Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y) <= 60) {
+          if (Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y) <= 65) {
             let hasSword = playerData.inventory.includes('Iron Sword');
             let damage = hasSword ? 20 : 10;
             mob.hp -= damage;
+            updateEnemyHpBar(mob);
+
             mob.setTint(0xffffff);
             scene.time.delayedCall(150, () => mob.clearTint());
 
-            dialogue.innerText = `Attacked enemy for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
+            dialogue.innerText = `Swung weapon for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
 
             if (mob.hp <= 0) {
-              // Spawn Loot Drop
-              let loot = scene.physics.add.sprite(mob.x, mob.y, 'lootTex').setDepth(2);
-              loot.rewardGold = Phaser.Math.Between(10, 25);
-              loot.rewardSeeds = Math.random() > 0.5 ? 1 : 0;
-              dungeonLootList.push(loot);
+              // Convert mob to Corpse
+              if (mob.hpBar) mob.hpBar.destroy();
+              let corpse = scene.physics.add.sprite(mob.x, mob.y, 'corpseTex').setDepth(1);
+              corpse.items = ['Gold Pouch', Math.random() > 0.5 ? 'Sword Seed' : 'Iron Sword'];
+              dungeonCorpses.push(corpse);
 
-              dialogue.innerText = "Enemy defeated! Walk over the Gold Pouch and press [A] to loot.";
+              dialogue.innerText = "Enemy slain! Press [A] over corpse to open drag & drop loot screen.";
               mob.destroy();
               dungeonEnemies.splice(i, 1);
             }
@@ -692,7 +808,7 @@
           }
         }
 
-        // 3. Interact with Dungeon Soil
+        // 3. Dungeon Soil
         for (let dSoil of dungeonSoilList) {
           if (Phaser.Math.Distance.Between(player.x, player.y, dSoil.x, dSoil.y) <= 60) {
             handleSoilInteraction(scene, dSoil, dialogue);
@@ -706,9 +822,21 @@
           buildHubMap(scene);
           return;
         }
-
-        dialogue.innerText = "Press [A] near enemies to attack or over items to loot!";
       }
+    }
+
+    function playAttackAnimation(scene) {
+      const offset = 24;
+      swordSlash.setPosition(
+        player.x + Math.cos(player.rotation) * offset,
+        player.y + Math.sin(player.rotation) * offset
+      );
+      swordSlash.setRotation(player.rotation);
+      swordSlash.setVisible(true);
+
+      scene.time.delayedCall(150, () => {
+        swordSlash.setVisible(false);
+      });
     }
 
     function handleSoilInteraction(scene, soilObj, dialogue) {
@@ -735,27 +863,34 @@
       }
     }
 
-    // --- GAME LOOP & RADAR MINIMAP RENDERER ---
+    // --- GAME LOOP & MINIMAP ---
     function update(time, delta) {
       player.body.setVelocity(0);
-      if (isInventoryOpen || isShopOpen) return;
+      if (isInventoryOpen || isShopOpen || isLootOpen) return;
 
-      // Player Movement
+      // Analog Joystick Rotation & Threshold Movement
       if (joystickActive) {
-        player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
-      } else {
-        if (cursors.left.isDown) player.body.setVelocityX(-SPEED);
-        else if (cursors.right.isDown) player.body.setVelocityX(SPEED);
+        let angle = Math.atan2(joystickVector.y, joystickVector.x);
+        player.setRotation(angle);
 
-        if (cursors.up.isDown) player.body.setVelocityY(-SPEED);
-        else if (cursors.down.isDown) player.body.setVelocityY(SPEED);
+        // Move player only when pushed past threshold radius
+        if (joystickDistance > MOVE_THRESHOLD) {
+          player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
+        }
+      } else {
+        if (cursors.left.isDown) { player.body.setVelocityX(-SPEED); player.setRotation(Math.PI); }
+        else if (cursors.right.isDown) { player.body.setVelocityX(SPEED); player.setRotation(0); }
+
+        if (cursors.up.isDown) { player.body.setVelocityY(-SPEED); player.setRotation(-Math.PI / 2); }
+        else if (cursors.down.isDown) { player.body.setVelocityY(SPEED); player.setRotation(Math.PI / 2); }
 
         player.body.velocity.normalize().scale(SPEED);
       }
 
-      // Dungeon Enemy AI & Contact Damage
+      // Enemy AI & Contact Damage
       if (currentZone === 'DUNGEON') {
         dungeonEnemies.forEach(mob => {
+          updateEnemyHpBar(mob);
           let dist = Phaser.Math.Distance.Between(mob.x, mob.y, player.x, player.y);
           if (dist < 180 && dist > 25) {
             game.scene.scenes[0].physics.moveToObject(mob, player, 65);
@@ -785,7 +920,6 @@
       }
     }
 
-    // Render Minimap in Top Right Corner
     function drawMinimap() {
       minimapGfx.clear();
       const mapSize = 90;
@@ -794,13 +928,11 @@
       const startY = 48;
       const scale = mapSize / MAP_GRID_SIZE;
 
-      // Map Background
       minimapGfx.fillStyle(0x0f172a, 0.85);
       minimapGfx.fillRect(startX, startY, mapSize, mapSize);
       minimapGfx.lineStyle(1, 0x38bdf8, 0.8);
       minimapGfx.strokeRect(startX, startY, mapSize, mapSize);
 
-      // Floor Grid
       minimapGfx.fillStyle(0x334155, 1);
       for (let y = 0; y < MAP_GRID_SIZE; y++) {
         for (let x = 0; x < MAP_GRID_SIZE; x++) {
@@ -810,7 +942,6 @@
         }
       }
 
-      // Exit Door Dot (Green)
       if (exitDoor) {
         let ex = Math.floor(exitDoor.x / TILE_SIZE) * scale;
         let ey = Math.floor(exitDoor.y / TILE_SIZE) * scale;
@@ -818,7 +949,6 @@
         minimapGfx.fillRect(startX + ex, startY + ey, 3, 3);
       }
 
-      // Enemies Dots (Red)
       minimapGfx.fillStyle(0xef4444, 1);
       dungeonEnemies.forEach(mob => {
         let mx = Math.floor(mob.x / TILE_SIZE) * scale;
@@ -826,7 +956,6 @@
         minimapGfx.fillRect(startX + mx, startY + my, 2, 2);
       });
 
-      // Player Dot (Cyan)
       let px = Math.floor(player.x / TILE_SIZE) * scale;
       let py = Math.floor(player.y / TILE_SIZE) * scale;
       minimapGfx.fillStyle(0x38bdf8, 1);
