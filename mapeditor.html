@@ -11,45 +11,70 @@
         #app { display: flex; flex-direction: column; width: 100vw; height: 100vh; height: 100dvh; position: relative; overflow: hidden; }
         
         #canvas-container { flex: 1; position: relative; overflow: hidden; background: #181818; display: flex; justify-content: center; align-items: center; min-height: 0; }
-        canvas { display: block; background: #222; }
+        canvas { display: block; background: #222; image-rendering: pixelated; image-rendering: crisp-edges; }
         
         /* UI Overlays */
         #top-bar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 5; }
         .hud-badge { background: rgba(0, 0, 0, 0.75); padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid rgba(255,255,255,0.15); pointer-events: auto; backdrop-filter: blur(4px); }
 
-        #toolbar { height: 75px; min-height: 75px; background: #202020; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; border-top: 1px solid #333; z-index: 10; flex-shrink: 0; width: 100%; }
-        .tool-btn { background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px 10px; border-radius: 8px; font-size: 11px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 52px; height: 55px; }
+        #toolbar { height: 75px; min-height: 75px; background: #202020; display: flex; align-items: center; justify-content: space-around; padding: 0 4px; border-top: 1px solid #333; z-index: 10; flex-shrink: 0; width: 100%; }
+        .tool-btn { background: #2c2c2c; color: white; border: 1px solid #444; padding: 8px 6px; border-radius: 8px; font-size: 10px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 48px; height: 55px; }
         .tool-btn:active, .tool-btn.active { background: #00bcd4; color: #000; border-color: #00bcd4; }
         
-        /* Drawer for Tileset Palette */
-        #palette-drawer { position: absolute; bottom: 75px; left: 0; right: 0; max-height: 45vh; background: rgba(25,25,25,0.95); border-top: 1px solid #444; backdrop-filter: blur(10px); transition: transform 0.3s ease; transform: translateY(100%); z-index: 8; display: flex; flex-direction: column; }
-        #palette-drawer.open { transform: translateY(0); }
-        .palette-header { padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; font-size: 13px; font-weight: bold; }
-        .palette-content { padding: 10px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        /* Drawer for Tileset Palette / Settings */
+        .drawer { position: absolute; bottom: 75px; left: 0; right: 0; max-height: 45vh; background: rgba(25,25,25,0.95); border-top: 1px solid #444; backdrop-filter: blur(10px); transition: transform 0.3s ease; transform: translateY(100%); z-index: 8; display: flex; flex-direction: column; }
+        .drawer.open { transform: translateY(0); }
+        .drawer-header { padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; font-size: 13px; font-weight: bold; }
+        .drawer-content { padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        
+        .setting-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .setting-row select, .setting-row input { background: #333; color: #fff; border: 1px solid #555; padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+
         .tileset-preview-group { margin-bottom: 15px; width: 100%; display: flex; flex-direction: column; align-items: center; }
         .tileset-name { font-size: 11px; color: #888; margin-bottom: 5px; }
-        canvas.tileset-canvas { border: 1px solid #444; border-radius: 4px; cursor: pointer; }
-        canvas.tileset-canvas.selected { border-color: #00bcd4; box-shadow: 0 0 8px rgba(0,188,212,0.5); }
+        canvas.tileset-canvas { border: 1px solid #444; border-radius: 4px; cursor: pointer; image-rendering: pixelated; image-rendering: crisp-edges; }
     </style>
 </head>
 <body>
     <div id="app">
         <div id="canvas-container">
             <div id="top-bar">
-                <div class="hud-badge" id="hudInfo">Layer: 0 | Zoom: 1.0x</div>
+                <div class="hud-badge" id="hudInfo">Grid: 16px | Zoom: 1.0x</div>
                 <div class="hud-badge" id="hudTool">Mode: Paint</div>
             </div>
             <canvas id="editorCanvas"></canvas>
         </div>
 
         <!-- Tile Selector Drawer -->
-        <div id="palette-drawer">
-            <div class="palette-header">
+        <div id="palette-drawer" class="drawer">
+            <div class="drawer-header">
                 <span>SELECT TILE FROM TILESETS</span>
                 <span id="closePalette" style="cursor:pointer; padding: 0 5px;">✕</span>
             </div>
-            <div class="palette-content" id="paletteContainer">
+            <div class="drawer-content" id="paletteContainer" style="flex-direction: column; align-items: center;">
                 <div style="color: #666; font-size: 13px; text-align: center; padding: 20px;">Upload a tileset image using the toolbar below.</div>
+            </div>
+        </div>
+
+        <!-- Settings Drawer -->
+        <div id="settings-drawer" class="drawer">
+            <div class="drawer-header">
+                <span>PROJECT SETTINGS</span>
+                <span id="closeSettings" style="cursor:pointer; padding: 0 5px;">✕</span>
+            </div>
+            <div class="drawer-content">
+                <div class="setting-row">
+                    <span>Tile Size (px):</span>
+                    <select id="tileSizeSelect">
+                        <option value="8">8 x 8</option>
+                        <option value="16" selected>16 x 16</option>
+                        <option value="32">32 x 32</option>
+                        <option value="64">64 x 64</option>
+                    </select>
+                </div>
+                <div style="font-size: 11px; color: #888; text-align: center; margin-top: -5px;">
+                    ⚠️ Changing tile size will reset the current map layout.
+                </div>
             </div>
         </div>
 
@@ -63,6 +88,7 @@
             <button class="tool-btn" id="btnRotate">🔄 0°</button>
             <button class="tool-btn" id="btnLayer">📑 L0</button>
             <button class="tool-btn" id="btnMode">🖌️ Paint</button>
+            <button class="tool-btn" id="btnSettings">⚙️ Config</button>
             <button class="tool-btn" id="btnExport">💾 Export</button>
         </div>
     </div>
@@ -71,9 +97,10 @@
         const canvas = document.getElementById('editorCanvas');
         const ctx = canvas.getContext('2d');
 
-        const TILE_SIZE = 32;
-        const MAP_WIDTH = 25;
-        const MAP_HEIGHT = 25;
+        // Config state
+        let TILE_SIZE = 16;
+        const MAP_WIDTH = 30;
+        const MAP_HEIGHT = 30;
 
         let scale = 1;
         let panX = 0;
@@ -103,12 +130,35 @@
         const hudInfo = document.getElementById('hudInfo');
         const hudTool = document.getElementById('hudTool');
         const paletteDrawer = document.getElementById('palette-drawer');
+        const settingsDrawer = document.getElementById('settings-drawer');
         const paletteContainer = document.getElementById('paletteContainer');
 
         function updateHUD() {
-            hudInfo.textContent = `Layer: ${currentLayer} | Zoom: ${scale.toFixed(1)}x`;
+            hudInfo.textContent = `Grid: ${TILE_SIZE}px | Zoom: ${scale.toFixed(1)}x`;
             hudTool.textContent = `Mode: ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)}`;
         }
+
+        // Tile Size Selector Change
+        document.getElementById('tileSizeSelect').addEventListener('change', (e) => {
+            const newSize = parseInt(e.target.value);
+            if (newSize === TILE_SIZE) return;
+
+            if (confirm("Changing tile size resets current map data. Proceed?")) {
+                TILE_SIZE = newSize;
+                layers = Array(maxLayers).fill(0).map(() => 
+                    Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill(null))
+                );
+                panX = 0;
+                panY = 0;
+                scale = 1;
+                rebuildPaletteUI();
+                updateHUD();
+                draw();
+                settingsDrawer.classList.remove('open');
+            } else {
+                e.target.value = TILE_SIZE;
+            }
+        });
 
         document.getElementById('uploadTiles').addEventListener('change', (e) => {
             const files = e.target.files;
@@ -150,7 +200,7 @@
                 
                 const label = document.createElement('div');
                 label.className = 'tileset-name';
-                label.textContent = ts.name;
+                label.textContent = `${ts.name} (${ts.cols}x${ts.rows} tiles)`;
                 group.appendChild(label);
 
                 const tsCanvas = document.createElement('canvas');
@@ -158,12 +208,17 @@
                 tsCanvas.width = ts.image.width;
                 tsCanvas.height = ts.image.height;
                 const tsCtx = tsCanvas.getContext('2d');
+                tsCtx.imageSmoothingEnabled = false;
                 tsCtx.drawImage(ts.image, 0, 0);
 
                 tsCanvas.addEventListener('click', (e) => {
                     const rect = tsCanvas.getBoundingClientRect();
-                    const clickX = e.clientX - rect.left;
-                    const clickY = e.clientY - rect.top;
+                    // Account for scaling if CSS changes canvas visual size
+                    const scaleX = ts.image.width / rect.width;
+                    const scaleY = ts.image.height / rect.height;
+                    const clickX = (e.clientX - rect.left) * scaleX;
+                    const clickY = (e.clientY - rect.top) * scaleY;
+                    
                     const tX = Math.floor(clickX / TILE_SIZE);
                     const tY = Math.floor(clickY / TILE_SIZE);
 
@@ -178,11 +233,21 @@
             });
         }
 
+        // Drawers toggle logic
         document.getElementById('btnPalette').addEventListener('click', () => {
+            settingsDrawer.classList.remove('open');
             paletteDrawer.classList.toggle('open');
         });
         document.getElementById('closePalette').addEventListener('click', () => {
             paletteDrawer.classList.remove('open');
+        });
+
+        document.getElementById('btnSettings').addEventListener('click', () => {
+            paletteDrawer.classList.remove('open');
+            settingsDrawer.classList.toggle('open');
+        });
+        document.getElementById('closeSettings').addEventListener('click', () => {
+            settingsDrawer.classList.remove('open');
         });
 
         const btnRotate = document.getElementById('btnRotate');
@@ -227,6 +292,7 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.imageSmoothingEnabled = false;
             
             ctx.save();
             ctx.translate(canvas.width / 2 + panX, canvas.height / 2 + panY);
@@ -291,6 +357,7 @@
         canvas.addEventListener('pointerdown', (e) => {
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             paletteDrawer.classList.remove('open');
+            settingsDrawer.classList.remove('open');
 
             if (pointers.size === 1) {
                 handleInteraction(e);
@@ -308,7 +375,7 @@
             if (pointers.size === 2 && initialPinchDistance) {
                 const currentDistance = getPinchDistance();
                 const scaleFactor = currentDistance / initialPinchDistance;
-                scale = Math.min(Math.max(0.5, initialScale * scaleFactor), 4.0);
+                scale = Math.min(Math.max(0.5, initialScale * scaleFactor), 5.0);
                 updateHUD();
                 draw();
             } else if (pointers.size === 1) {
@@ -358,7 +425,7 @@
                 if (currentMode === 'paint' && tilesets.length > 0) {
                     layers[currentLayer][tileY][tileX] = {
                         tilesetIndex: selectedTile.tilesetIndex,
-                        tileX: selectedTrustTileX = selectedTile.tileX,
+                        tileX: selectedTile.tileX,
                         tileY: selectedTile.tileY,
                         rotation: currentRotation
                     };
