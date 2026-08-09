@@ -147,7 +147,8 @@
   </div>
 
   <div id="hud">
-    <div class="hud-box" id="stash-info">HP: ❤️ 100 | Stash Items: 📦 0/8</div>
+    <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.0</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -211,6 +212,10 @@
   </div>
 
   <script>
+    // --- VERSION CONTROL ---
+    const GAME_VERSION = 'v1.3.0';
+    document.getElementById('version-display').innerText = GAME_VERSION;
+
     // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
     const DEFAULT_DATA = { 
       hp: 100, 
@@ -542,12 +547,11 @@
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // TRUE TOP-DOWN PLAYER SPRITE (Head circle, torso, shoulders, and sword handle pointing right)
       const playerGfx = scene.make.graphics({ add: false });
-      playerGfx.fillStyle(0x38bdf8, 1).fillCircle(16, 16, 10); // Torso / Body
-      playerGfx.fillStyle(0xfbebe8, 1).fillCircle(16, 12, 6);  // Head / Hair (Top view)
-      playerGfx.fillStyle(0x1e293b, 1).fillRect(8, 13, 16, 6);  // Shoulders armor band
-      playerGfx.fillStyle(0x94a3b8, 1).fillRect(22, 14, 8, 4);  // Sword handle/blade pointing right
+      playerGfx.fillStyle(0x38bdf8, 1).fillCircle(16, 16, 10);
+      playerGfx.fillStyle(0xfbebe8, 1).fillCircle(16, 12, 6);
+      playerGfx.fillStyle(0x1e293b, 1).fillRect(8, 13, 16, 6);
+      playerGfx.fillStyle(0x94a3b8, 1).fillRect(22, 14, 8, 4);
       playerGfx.generateTexture('playerTex', 32, 32);
 
       const slashGfx = scene.make.graphics({ add: false });
