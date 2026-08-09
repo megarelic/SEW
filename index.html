@@ -116,7 +116,7 @@
     .inv-slot {
       aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 9px; text-align: center; padding: 2px; color: #cbd5e1; cursor: pointer;
+      font-size: 8px; text-align: center; padding: 2px; color: #cbd5e1; cursor: pointer; line-height: 1.1;
     }
     .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
     .inv-slot.equipped { border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.2); }
@@ -148,11 +148,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.3</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.5</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Tap enemies to target & HP inspect. Click soil to inspect, hold to plant!</div>
+  <div id="dialogue-box">Surface Hub: Kenney player sprite integrated with horizontal flip focus!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -163,7 +163,7 @@
   <div id="inventory-modal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>🎒 Stash & Inventory (16 Slots - Double-Tap to Equip)</h2>
+        <h2>🎒 Stash & Inventory (Double-Tap to Equip)</h2>
         <button class="close-btn" id="btn-close-inv">✕</button>
       </div>
       <div class="inv-grid" id="inv-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 220px;"></div>
@@ -217,19 +217,19 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.3';
+    const GAME_VERSION = 'v1.4.5';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
-    // --- 1. LOCAL STORAGE & 16-SLOT INVENTORY ---
+    // --- 1. LOCAL STORAGE & INVENTORY ---
     const DEFAULT_DATA = { 
       hp: 100, 
       maxHp: 100, 
-      equipped: 'Iron Sword',
+      equippedIndex: 3,
       inventory: [
         { name: 'Gold', count: 35 },
         { name: 'Sword Seed', count: 2 },
         { name: 'Bow Seed', count: 1 },
-        { name: 'Hunting Bow' }
+        { name: 'Hunting Bow', type: 'bow', dmg: 24, speed: 520, quality: 'Fine' }
       ] 
     };
 
@@ -259,49 +259,64 @@
       return total;
     }
 
-    function addPlayerItem(itemName, count = 1) {
-      if (itemName === 'Gold' || itemName === 'Sword Seed' || itemName === 'Bow Seed') {
-        let existing = playerData.inventory.find(i => i.name === itemName);
+    function addPlayerItem(itemObj) {
+      if (itemObj.name === 'Gold' || itemObj.name === 'Sword Seed' || itemObj.name === 'Bow Seed') {
+        let existing = playerData.inventory.find(i => i.name === itemObj.name);
         if (existing) {
-          existing.count = (existing.count || 1) + count;
+          existing.count = (existing.count || 1) + (itemObj.count || 1);
           savePlayerData(playerData);
           return true;
         }
       }
 
       if (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
-        if (itemName === 'Gold' || itemName === 'Sword Seed' || itemName === 'Bow Seed') {
-          playerData.inventory.push({ name: itemName, count: count });
-        } else {
-          playerData.inventory.push({ name: itemName });
-        }
+        playerData.inventory.push(itemObj);
         savePlayerData(playerData);
         return true;
       }
       return false;
     }
 
-    function removePlayerItem(itemName, count = 1) {
-      let existing = playerData.inventory.find(i => i.name === itemName);
-      if (!existing) return false;
+    function removePlayerItemAtIndex(index, count = 1) {
+      let item = playerData.inventory[index];
+      if (!item) return false;
 
-      if (existing.count && existing.count > count) {
-        existing.count -= count;
+      if (item.count && item.count > count) {
+        item.count -= count;
       } else {
-        let idx = playerData.inventory.indexOf(existing);
-        playerData.inventory.splice(idx, 1);
+        playerData.inventory.splice(index, 1);
+        if (playerData.equippedIndex === index) {
+          playerData.equippedIndex = null;
+        } else if (playerData.equippedIndex > index) {
+          playerData.equippedIndex--;
+        }
       }
       savePlayerData(playerData);
       return true;
+    }
+
+    function getEquippedWeapon() {
+      if (playerData.equippedIndex !== null && playerData.inventory[playerData.equippedIndex]) {
+        let item = playerData.inventory[playerData.equippedIndex];
+        if (item.type === 'sword' || item.type === 'bow') return item;
+      }
+      for (let i = 0; i < playerData.inventory.length; i++) {
+        let item = playerData.inventory[i];
+        if (item.type === 'sword' || item.type === 'bow') {
+          playerData.equippedIndex = i;
+          return item;
+        }
+      }
+      return { name: 'Fists', type: 'sword', dmg: 10, quality: 'Basic' };
     }
 
     function updateUI() {
       let gold = getPlayerItemCount('Gold');
       let swords = getPlayerItemCount('Sword Seed');
       let bows = getPlayerItemCount('Bow Seed');
-      let eq = playerData.equipped || 'None';
+      let eqWeapon = getEquippedWeapon();
       document.getElementById('stash-info').innerHTML = 
-        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | 🪙 ${gold} | 🌰 ${swords} | 🏹 ${bows} | Eq: ⚔️/🏹 ${eq}`;
+        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | 🪙 ${gold} | 🌰 ${swords} | 🏹 ${bows} | Eq: ${eqWeapon.quality || ''} ${eqWeapon.name} (${eqWeapon.dmg} DMG)`;
     }
 
     // --- 2. MODALS & INVENTORY ACTIONS ---
@@ -322,20 +337,20 @@
           let item = playerData.inventory[i];
           if (item) {
             slot.classList.add('filled');
-            if (item.name === playerData.equipped) slot.classList.add('equipped');
+            if (i === playerData.equippedIndex) slot.classList.add('equipped');
 
             if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold<br>(${item.count})`;
             else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Sword Seed<br>(${item.count})`;
             else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>Bow Seed<br>(${item.count})`;
-            else if (item.name === 'Iron Sword') slot.innerHTML = `⚔️<br>Iron Sword${item.name === playerData.equipped ? '<br>(Eq)' : ''}`;
-            else if (item.name === 'Hunting Bow') slot.innerHTML = `🏹<br>Hunting Bow${item.name === playerData.equipped ? '<br>(Eq)' : ''}`;
+            else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
+            else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
 
             let lastTap = 0;
             slot.addEventListener('pointerdown', (e) => {
               let currentTime = new Date().getTime();
-              if (currentTime - lastTap < 350 && (item.name === 'Iron Sword' || item.name === 'Hunting Bow')) {
+              if (currentTime - lastTap < 350 && (item.type === 'sword' || item.type === 'bow')) {
                 e.preventDefault();
-                playerData.equipped = item.name;
+                playerData.equippedIndex = i;
                 savePlayerData(playerData);
                 toggleInventory(true);
               }
@@ -357,21 +372,26 @@
 
     function refreshShopUI() {
       shopSellList.innerHTML = '';
-      let sellable = playerData.inventory.filter(i => i.name === 'Iron Sword' || i.name === 'Hunting Bow');
+      let sellableIndices = [];
+      playerData.inventory.forEach((i, idx) => {
+        if (i.type === 'sword' || i.type === 'bow') sellableIndices.push(idx);
+      });
       
-      if (sellable.length === 0) {
+      if (sellableIndices.length === 0) {
         shopSellList.innerHTML = `<div class="shop-row" style="color: #94a3b8;">No weapons in inventory to sell.</div>`;
         return;
       }
 
-      sellable.forEach((item) => {
+      sellableIndices.forEach((idx) => {
+        let item = playerData.inventory[idx];
         const row = document.createElement('div');
         row.className = 'shop-row';
-        let icon = item.name === 'Iron Sword' ? '⚔️' : '🏹';
-        row.innerHTML = `<span>${icon} ${item.name}</span><button class="action-shop-btn sell-btn">Sell (🪙 20)</button>`;
+        let icon = item.type === 'sword' ? '⚔️' : '🏹';
+        let sellPrice = item.dmg * 2;
+        row.innerHTML = `<span>${icon} ${item.quality} (${item.dmg} DMG)</span><button class="action-shop-btn sell-btn">Sell (🪙 ${sellPrice})</button>`;
         row.querySelector('.sell-btn').addEventListener('click', () => {
-          removePlayerItem(item.name, 1);
-          addPlayerItem('Gold', 20);
+          removePlayerItemAtIndex(idx, 1);
+          addPlayerItem({ name: 'Gold', count: sellPrice });
           refreshShopUI();
         });
         shopSellList.appendChild(row);
@@ -394,12 +414,11 @@
       activeCorpseLoot.items.forEach((itemObj, idx) => {
         const slot = document.createElement('div');
         slot.className = 'inv-slot filled';
-        slot.draggable = true;
         if (itemObj.name === 'Gold') slot.innerHTML = `🪙 Gold<br>(${itemObj.count})`;
         else if (itemObj.name === 'Sword Seed') slot.innerHTML = `🌰 Sword Seed<br>(${itemObj.count})`;
         else if (itemObj.name === 'Bow Seed') slot.innerHTML = `🏹🌰 Bow Seed<br>(${itemObj.count})`;
-        else if (itemObj.name === 'Iron Sword') slot.innerHTML = `⚔️ Iron Sword`;
-        else if (itemObj.name === 'Hunting Bow') slot.innerHTML = `🏹 Hunting Bow`;
+        else if (itemObj.type === 'sword') slot.innerHTML = `⚔️ ${itemObj.quality}<br>${itemObj.dmg} DMG`;
+        else if (itemObj.type === 'bow') slot.innerHTML = `🏹 ${itemObj.quality}<br>${itemObj.dmg} DMG`;
 
         let lastTap = 0;
         slot.addEventListener('pointerdown', (e) => {
@@ -407,7 +426,7 @@
           if (currentTime - lastTap < 350) {
             e.preventDefault();
             let looted = activeCorpseLoot.items.splice(idx, 1)[0];
-            let success = addPlayerItem(looted.name, looted.count || 1);
+            let success = addPlayerItem(looted);
             if (!success) activeCorpseLoot.items.push(looted);
             renderLootGrid();
           }
@@ -430,8 +449,8 @@
           if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold (${item.count})`;
           else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Sword Seed (${item.count})`;
           else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>Bow Seed (${item.count})`;
-          else if (item.name === 'Iron Sword') slot.innerHTML = `⚔️<br>Iron Sword`;
-          else if (item.name === 'Hunting Bow') slot.innerHTML = `🏹<br>Hunting Bow`;
+          else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.quality}<br>${item.dmg} DMG`;
+          else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.quality}<br>${item.dmg} DMG`;
         } else {
           slot.innerText = 'Empty';
         }
@@ -441,19 +460,33 @@
 
     document.getElementById('btn-buy-sword-seed').addEventListener('click', () => {
       if (getPlayerItemCount('Gold') >= 10) {
-        removePlayerItem('Gold', 10);
-        addPlayerItem('Sword Seed', 1);
+        removePlayerItemByName('Gold', 10);
+        addPlayerItem({ name: 'Sword Seed', count: 1 });
         document.getElementById('dialogue-box').innerText = "Purchased 1 Sword Seed!";
       } else { document.getElementById('dialogue-box').innerText = "Not enough Gold!"; }
     });
 
     document.getElementById('btn-buy-bow-seed').addEventListener('click', () => {
       if (getPlayerItemCount('Gold') >= 15) {
-        removePlayerItem('Gold', 15);
-        addPlayerItem('Bow Seed', 1);
+        removePlayerItemByName('Gold', 15);
+        addPlayerItem({ name: 'Bow Seed', count: 1 });
         document.getElementById('dialogue-box').innerText = "Purchased 1 Bow Seed!";
       } else { document.getElementById('dialogue-box').innerText = "Not enough Gold!"; }
     });
+
+    function removePlayerItemByName(itemName, count = 1) {
+      let existing = playerData.inventory.find(i => i.name === itemName);
+      if (!existing) return false;
+      if (existing.count && existing.count > count) {
+        existing.count -= count;
+      } else {
+        let idx = playerData.inventory.indexOf(existing);
+        playerData.inventory.splice(idx, 1);
+        if (playerData.equippedIndex === idx) playerData.equippedIndex = null;
+      }
+      savePlayerData(playerData);
+      return true;
+    }
 
     document.getElementById('btn-bag').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(true); });
     document.getElementById('btn-close-inv').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(false); });
@@ -524,8 +557,8 @@
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & CLICK-TO-INTERACT ---
-    let player, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
+    // --- 4. PHASER 3 ENGINE & KENNEY SPRITE LOADER ---
+    let player, aimReticle, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
     let dungeonEnemies = [];
@@ -540,6 +573,7 @@
 
     let dungeonGrid = [];
     let lastDamageTime = 0;
+    let aimAngle = 0;
 
     const SPEED = 150;
     const TILE_SIZE = 32;
@@ -553,10 +587,16 @@
       pixelArt: true,
       scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
       physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
-      scene: { create, update }
+      scene: { preload, create, update }
     };
 
     const game = new Phaser.Game(config);
+
+    function preload() {
+      const scene = this;
+      // Load Kenney player sprite directly from GitHub repo URL
+      scene.load.image('playerSprite', 'https://raw.githubusercontent.com/megarelic/SEW/main/tile_0084.png');
+    }
 
     function create() {
       const scene = this;
@@ -581,13 +621,6 @@
       soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
-
-      const playerGfx = scene.make.graphics({ add: false });
-      playerGfx.fillStyle(0x38bdf8, 1).fillCircle(16, 16, 10);
-      playerGfx.fillStyle(0xfbebe8, 1).fillCircle(16, 12, 6);
-      playerGfx.fillStyle(0x1e293b, 1).fillRect(8, 13, 16, 6);
-      playerGfx.fillStyle(0x94a3b8, 1).fillRect(22, 14, 8, 4);
-      playerGfx.generateTexture('playerTex', 32, 32);
 
       const slashGfx = scene.make.graphics({ add: false });
       slashGfx.fillStyle(0x38bdf8, 0.7);
@@ -630,10 +663,13 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
+      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerSprite');
       player.setCollideWorldBounds(true);
       player.setDepth(10);
       player.body.setSize(18, 18).setOffset(7, 7);
+
+      // Aim reticle dot to show aim direction without rotating player sprite
+      aimReticle = scene.add.circle(0, 0, 4, 0x38bdf8).setDepth(12);
 
       swordSlash = scene.add.sprite(0, 0, 'slashTex').setDepth(11).setVisible(false);
       arrowProj = scene.physics.add.sprite(0, 0, 'arrowTex').setDepth(11).setVisible(false);
@@ -661,23 +697,20 @@
 
       cursors = scene.input.keyboard.createCursorKeys();
 
-      // Single Attack Button [A]
       document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
         e.preventDefault();
         handleCombatAction(scene);
       });
 
-      // --- WORLD CLICK / TAP INTERACTION HANDLER ---
       let plantInterval = null;
       scene.input.on('pointerdown', (pointer) => {
         if (isInventoryOpen || isShopOpen || isLootOpen) return;
-        if (pointer.y > window.innerHeight - 130 && pointer.x < 140) return; // Ignore joystick area
-        if (pointer.y > window.innerHeight - 100 && pointer.x > window.innerWidth - 100) return; // Ignore attack button
+        if (pointer.y > window.innerHeight - 130 && pointer.x < 140) return;
+        if (pointer.y > window.innerHeight - 100 && pointer.x > window.innerWidth - 100) return;
 
         let worldPoint = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
         const dialogue = document.getElementById('dialogue-box');
 
-        // Check Enemy Click (Inspect HP)
         for (let mob of dungeonEnemies) {
           if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, mob.x, mob.y) <= 24) {
             mob.showHp = true;
@@ -687,7 +720,6 @@
           }
         }
 
-        // Check Soil Click / Hold-to-Plant
         let targetSoil = null;
         if (currentZone === 'HUB' && hubSoil) {
           if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, hubSoil.x, hubSoil.y) <= 30) targetSoil = hubSoil;
@@ -706,10 +738,10 @@
             if (distToPlayer <= 60) {
               targetSoil.state = 'EMPTY';
               targetSoil.clearTint();
-              let reward = targetSoil.seedType === 'Bow Seed' ? 'Hunting Bow' : 'Iron Sword';
-              addPlayerItem(reward, 1);
-              addPlayerItem('Gold', 15);
-              dialogue.innerText = `Harvested ${reward} & 15 Gold!`;
+              let harvestedWeapon = generateUniqueWeapon(targetSoil.seedType === 'Bow Seed' ? 'bow' : 'sword');
+              addPlayerItem(harvestedWeapon);
+              addPlayerItem({ name: 'Gold', count: 15 });
+              dialogue.innerText = `Harvested ${harvestedWeapon.quality} ${harvestedWeapon.name} (${harvestedWeapon.dmg} DMG) & 15 Gold!`;
             } else {
               dialogue.innerText = "Walk closer to harvest this crop!";
             }
@@ -729,7 +761,6 @@
                 }
               }, 50);
 
-              // Cancel hold on pointerup
               scene.input.once('pointerup', () => {
                 if (plantInterval) {
                   clearInterval(plantInterval);
@@ -744,7 +775,6 @@
           }
         }
 
-        // Check Corpse Click (Loot)
         if (currentZone === 'DUNGEON') {
           for (let corpse of dungeonCorpses) {
             if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, corpse.x, corpse.y) <= 30) {
@@ -758,7 +788,6 @@
           }
         }
 
-        // Check Merchant / Doors Click
         if (currentZone === 'HUB') {
           if (merchant && Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, merchant.x, merchant.y) <= 35) {
             if (Phaser.Math.Distance.Between(player.x, player.y, merchant.x, merchant.y) <= 75) {
@@ -785,6 +814,21 @@
       updateUI();
     }
 
+    function generateUniqueWeapon(type) {
+      let roll = Math.random();
+      let quality, dmg, speed;
+      if (roll < 0.5) { quality = 'Worn'; dmg = Phaser.Math.Between(12, 18); speed = 450; }
+      else if (roll < 0.85) { quality = 'Sturdy'; dmg = Phaser.Math.Between(19, 26); speed = 500; }
+      else if (roll < 0.98) { quality = 'Honed'; dmg = Phaser.Math.Between(27, 35); speed = 550; }
+      else { quality = 'Masterwork'; dmg = Phaser.Math.Between(36, 45); speed = 600; }
+
+      if (type === 'sword') {
+        return { name: 'Iron Sword', type: 'sword', dmg: dmg, speed: speed, quality: quality };
+      } else {
+        return { name: 'Hunting Bow', type: 'bow', dmg: dmg, speed: speed + 50, quality: quality };
+      }
+    }
+
     function buildHubMap(scene) {
       currentZone = 'HUB';
       clearDungeon(scene);
@@ -809,7 +853,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Tap objects in the world to interact!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Kenney sprite with horizontal flip focus active!";
       updateUI();
     }
 
@@ -1010,7 +1054,7 @@
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Tap enemies to inspect HP. Click soil to inspect, hold to plant!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Explore and defeat mobs!";
       updateUI();
     }
 
@@ -1072,7 +1116,7 @@
 
         if (swordSeeds > 0 || bowSeeds > 0) {
           let chosenSeed = swordSeeds > 0 ? 'Sword Seed' : 'Bow Seed';
-          removePlayerItem(chosenSeed, 1);
+          removePlayerItemByName(chosenSeed, 1);
           targetSoil.seedType = chosenSeed;
           targetSoil.state = 'GROWING';
           targetSoil.setTint(0xeab308);
@@ -1090,24 +1134,25 @@
     function handleCombatAction(scene) {
       if (isInventoryOpen || isShopOpen || isLootOpen) return;
       const dialogue = document.getElementById('dialogue-box');
+      let eqWeapon = getEquippedWeapon();
 
-      if (playerData.equipped === 'Hunting Bow') {
+      if (eqWeapon.type === 'bow') {
         arrowProj.setPosition(player.x, player.y);
-        arrowProj.setRotation(player.rotation);
+        arrowProj.setRotation(aimAngle);
         arrowProj.setVisible(true);
-        scene.physics.velocityFromRotation(player.rotation, 500, arrowProj.body.velocity);
-        dialogue.innerText = "Fired an arrow!";
+        scene.physics.velocityFromRotation(aimAngle, eqWeapon.speed, arrowProj.body.velocity);
+        arrowProj.damage = eqWeapon.dmg;
+        dialogue.innerText = `Fired ${eqWeapon.quality} Bow (${eqWeapon.dmg} DMG)!`;
       } else {
         playAttackAnimation(scene);
       }
 
       if (currentZone === 'DUNGEON') {
-        if (playerData.equipped !== 'Hunting Bow') {
+        if (eqWeapon.type !== 'bow') {
           for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
             let mob = dungeonEnemies[i];
-            let hasSword = playerData.equipped === 'Iron Sword';
             if (Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y) <= 65) {
-              let damage = hasSword ? 20 : 10;
+              let damage = eqWeapon.dmg;
               mob.hp -= damage;
               mob.showHp = true;
               updateEnemyHpBar(mob);
@@ -1115,7 +1160,7 @@
               mob.setTint(0xffffff);
               scene.time.delayedCall(150, () => mob.clearTint());
 
-              dialogue.innerText = `Swung weapon for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
+              dialogue.innerText = `Swung ${eqWeapon.quality} Sword for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
 
               if (mob.hp <= 0) {
                 if (mob.hpBar) mob.hpBar.destroy();
@@ -1123,7 +1168,7 @@
                 
                 corpse.items = [
                   { name: 'Gold', count: Phaser.Math.Between(10, 20) },
-                  { name: Math.random() > 0.4 ? 'Sword Seed' : 'Bow Seed', count: 1 }
+                  generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow')
                 ];
                 dungeonCorpses.push(corpse);
 
@@ -1141,10 +1186,10 @@
     function playAttackAnimation(scene) {
       const offset = 24;
       swordSlash.setPosition(
-        player.x + Math.cos(player.rotation) * offset,
-        player.y + Math.sin(player.rotation) * offset
+        player.x + Math.cos(aimAngle) * offset,
+        player.y + Math.sin(aimAngle) * offset
       );
-      swordSlash.setRotation(player.rotation);
+      swordSlash.setRotation(aimAngle);
       swordSlash.setVisible(true);
 
       scene.time.delayedCall(150, () => {
@@ -1157,27 +1202,54 @@
       if (isInventoryOpen || isShopOpen || isLootOpen) return;
 
       if (joystickActive) {
-        let angle = Math.atan2(joystickVector.y, joystickVector.x);
-        player.setRotation(angle);
+        aimAngle = Math.atan2(joystickVector.y, joystickVector.x);
+
+        // Flip sprite horizontally based on joystick direction
+        if (joystickVector.x < -0.1) {
+          player.setFlipX(true);
+        } else if (joystickVector.x > 0.1) {
+          player.setFlipX(false);
+        }
 
         if (joystickDistance > MOVE_THRESHOLD) {
           player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
         }
       } else {
-        if (cursors.left.isDown) { player.body.setVelocityX(-SPEED); player.setRotation(Math.PI); }
-        else if (cursors.right.isDown) { player.body.setVelocityX(SPEED); player.setRotation(0); }
+        if (cursors.left.isDown) {
+          player.body.setVelocityX(-SPEED);
+          aimAngle = Math.PI;
+          player.setFlipX(true);
+        } else if (cursors.right.isDown) {
+          player.body.setVelocityX(SPEED);
+          aimAngle = 0;
+          player.setFlipX(false);
+        }
 
-        if (cursors.up.isDown) { player.body.setVelocityY(-SPEED); player.setRotation(-Math.PI / 2); }
-        else if (cursors.down.isDown) { player.body.setVelocityY(SPEED); player.setRotation(Math.PI / 2); }
+        if (cursors.up.isDown) {
+          player.body.setVelocityY(-SPEED);
+          aimAngle = -Math.PI / 2;
+        } else if (cursors.down.isDown) {
+          player.body.setVelocityY(SPEED);
+          aimAngle = Math.PI / 2;
+        }
 
         player.body.velocity.normalize().scale(SPEED);
+      }
+
+      // Position aim reticle slightly in front of the player based on aimAngle
+      if (aimReticle) {
+        aimReticle.setPosition(
+          player.x + Math.cos(aimAngle) * 24,
+          player.y + Math.sin(aimAngle) * 24
+        );
       }
 
       if (arrowProj && arrowProj.visible) {
         for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
           let mob = dungeonEnemies[i];
           if (Phaser.Math.Distance.Between(arrowProj.x, arrowProj.y, mob.x, mob.y) < 20) {
-            mob.hp -= 25;
+            let dmg = arrowProj.damage || 25;
+            mob.hp -= dmg;
             mob.showHp = true;
             updateEnemyHpBar(mob);
             arrowProj.setVisible(false);
@@ -1188,7 +1260,7 @@
               let corpse = game.scene.scenes[0].physics.add.sprite(mob.x, mob.y, 'corpseTex').setDepth(1);
               corpse.items = [
                 { name: 'Gold', count: Phaser.Math.Between(10, 20) },
-                { name: Math.random() > 0.4 ? 'Sword Seed' : 'Bow Seed', count: 1 }
+                generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow')
               ];
               dungeonCorpses.push(corpse);
               mob.destroy();
