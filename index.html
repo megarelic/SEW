@@ -4,14 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   
-  <!-- Modern iOS & PWA Standalone Manifest -->
-  <link rel="manifest" href='data:application/manifest+json,{"name":"SEW","short_name":"SEW","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"any"}' />
+  <!-- Web App Manifest (Forces Landscape Mode when launched from Home Screen) -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"SEW","short_name":"SEW","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"landscape"}' />
   
-  <!-- Legacy iOS Safari Standalone Meta Tags -->
+  <!-- iOS Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="SEW" />
-  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#0f172a" />
   
   <title>SEW - Subterranean Extraction Warfare</title>
@@ -27,11 +26,9 @@
       -webkit-touch-callout: none;
     }
 
-    /* Lock body down on iOS to prevent address bar shifting */
     html, body {
       width: 100%;
       height: 100%;
-      height: -webkit-fill-available;
       height: 100dvh;
       overflow: hidden;
       position: fixed;
@@ -48,12 +45,38 @@
       margin: 0 auto;
     }
 
-    /* Top Status Bar */
+    /* Rotate Phone Warning Screen (Only appears when held in Portrait mode) */
+    #rotate-screen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background: #0f172a;
+      color: #38bdf8;
+      z-index: 100;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 24px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    #rotate-screen span { font-size: 48px; margin-bottom: 12px; }
+
+    @media (orientation: portrait) {
+      #rotate-screen { display: flex; }
+    }
+
+    /* Top Status Bar (Adjusted for Landscape viewports) */
     #hud {
       position: absolute;
-      top: 16px;
-      left: 12px;
-      right: 12px;
+      top: 12px;
+      left: 20px;
+      right: 20px;
       z-index: 10;
       display: flex;
       justify-content: space-between;
@@ -62,7 +85,7 @@
     .hud-box {
       background: rgba(15, 23, 42, 0.85);
       border: 2px solid rgba(255, 255, 255, 0.15);
-      padding: 8px 12px;
+      padding: 6px 12px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: bold;
@@ -72,27 +95,27 @@
     /* Dialogue Box */
     #dialogue-box {
       position: absolute;
-      top: 64px;
-      left: 12px;
-      right: 12px;
+      top: 48px;
+      left: 20%;
+      right: 20%;
       z-index: 10;
       background: rgba(15, 23, 42, 0.9);
       border: 2px solid #38bdf8;
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 12px;
       color: #e2e8f0;
       pointer-events: none;
       text-align: center;
     }
 
-    /* Virtual Controls Container */
+    /* Landscape Controls Layout */
     #controls {
       position: absolute;
-      bottom: 28px;
-      left: 16px;
-      right: 16px;
-      height: 140px;
+      bottom: 16px;
+      left: 20px;
+      right: 20px;
+      height: 100px;
       z-index: 20;
       display: flex;
       justify-content: space-between;
@@ -100,11 +123,11 @@
       pointer-events: none;
     }
 
-    /* D-PAD */
+    /* D-PAD (Bottom Left) */
     .dpad {
       position: relative;
-      width: 120px;
-      height: 120px;
+      width: 100px;
+      height: 100px;
       pointer-events: auto;
     }
     .dpad-btn {
@@ -112,31 +135,31 @@
       background: rgba(255, 255, 255, 0.2);
       border: 2px solid rgba(255, 255, 255, 0.4);
       border-radius: 6px;
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 14px;
       color: #fff;
       backdrop-filter: blur(4px);
     }
     .dpad-btn:active { background: rgba(56, 189, 248, 0.6); }
-    #btn-up { top: 0; left: 40px; }
-    #btn-down { bottom: 0; left: 40px; }
-    #btn-left { top: 40px; left: 0; }
-    #btn-right { top: 40px; right: 0; }
+    #btn-up { top: 0; left: 34px; }
+    #btn-down { bottom: 0; left: 34px; }
+    #btn-left { top: 34px; left: 0; }
+    #btn-right { top: 34px; right: 0; }
 
-    /* Action Button "A" */
+    /* Action Button "A" (Bottom Right) */
     .action-btn {
-      width: 70px;
-      height: 70px;
+      width: 60px;
+      height: 60px;
       border-radius: 50%;
       background: rgba(34, 197, 94, 0.4);
       border: 3px solid rgba(34, 197, 94, 0.8);
       color: #fff;
-      font-size: 22px;
+      font-size: 20px;
       font-weight: bold;
       display: flex;
       align-items: center;
@@ -148,6 +171,12 @@
   </style>
 </head>
 <body>
+
+  <!-- Orientation Warning Overlay -->
+  <div id="rotate-screen">
+    <span>🔄</span>
+    Please rotate your phone to Landscape mode to play SEW!
+  </div>
 
   <div id="hud">
     <div class="hud-box" id="stash-info">Gold: 🪙 0 | Seeds: 🌰 3</div>
@@ -167,7 +196,7 @@
   </div>
 
   <script>
-    // --- 1. LOCAL STORAGE PERSISTENCE ---
+    // --- 1. STORAGE ---
     const DEFAULT_DATA = { gold: 25, seeds: 3, inventory: [] };
 
     function getPlayerData() {
@@ -187,10 +216,10 @@
       document.getElementById('gear-info').innerHTML = `Gear: [${playerData.inventory.length ? playerData.inventory.join(', ') : 'Empty'}]`;
     }
 
-    // --- 2. GAME ENGINE SETUP ---
+    // --- 2. GAME ENGINE ---
     let player, cursors, soilPatch, currentSoilState = 'EMPTY';
     let moveDir = { up: false, down: false, left: false, right: false };
-    const SPEED = 120;
+    const SPEED = 130;
 
     const config = {
       type: Phaser.AUTO,
@@ -213,7 +242,7 @@
     function create() {
       const scene = this;
 
-      // Render Tile Floor
+      // Render Tile Floor Grid
       const tileGfx = scene.make.graphics({ add: false });
       tileGfx.fillStyle(0x1e293b, 1).fillRect(0, 0, 32, 32);
       tileGfx.lineStyle(1, 0x334155, 0.5).strokeRect(0, 0, 32, 32);
@@ -225,21 +254,21 @@
         }
       }
 
-      // Soil Patch
+      // Soil Patch Sprite
       const soilGfx = scene.make.graphics({ add: false });
       soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // Hero Character
+      // Hero Sprite
       const playerGfx = scene.make.graphics({ add: false });
       playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24);
       playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);
       playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);
       playerGfx.generateTexture('playerTex', 32, 32);
 
-      soilPatch = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 - 40, 'soilTex');
-      player = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 + 80, 'playerTex');
+      soilPatch = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 - 20, 'soilTex');
+      player = scene.physics.add.sprite(window.innerWidth / 2 - 80, window.innerHeight / 2 - 20, 'playerTex');
       player.setCollideWorldBounds(true);
 
       cursors = scene.input.keyboard.createCursorKeys();
