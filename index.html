@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>SEW - Subterranean Extraction Warfare</title>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body { background-color: #0d0f12; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
+    
+    /* Mobile HUD Overlay */
+    #hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    .hud-box {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="hud">
+    <div class="hud-box" id="stash-info">Gold: 🪙 0 | Seeds: 🌰 3</div>
+    <div class="hud-box" id="status-info">Status: Dungeon Floor</div>
+  </div>
+
+  <script>
+    // --- 1. LOCAL PLAYER DATA & STORAGE ---
+    const DEFAULT_DATA = { gold: 25, swordSeeds: 3, inventory: [] };
+
+    function getPlayerData() {
+      const saved = localStorage.getItem('SEW_SAVE_DATA');
+      return saved ? JSON.parse(saved) : DEFAULT_DATA;
+    }
+
+    function savePlayerData(data) {
+      localStorage.setItem('SEW_SAVE_DATA', JSON.stringify(data));
+      updateHUD();
+    }
+
+    let playerData = getPlayerData();
+
+    function updateHUD() {
+      document.getElementById('stash-info').innerHTML = 
+        `Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.swordSeeds} | Gear: [${playerData.inventory.join(', ')}]`;
+    }
+
+    // --- 2. PHASER 3 GAME ENGINE ---
+    let player, targetPoint = null, soilPatch;
+
+    const config = {
+      type: Phaser.AUTO,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      },
+      physics: {
+        default: 'arcade',
+        arcade: { gravity: { y: 0 }, debug: false }
+      },
+      scene: { create, update }
+    };
+
+    const game = new Phaser.Game(config);
+
+    function create() {
+      const scene = this;
+
+      // Create textures programmatically (No image files required yet)
+      const playerGfx = scene.make.graphics({ add: false });
+      playerGfx.fillStyle(0x3b82f6, 1).fillCircle(16, 16, 16);
+      playerGfx.generateTexture('playerTex', 32, 32);
+
+      const soilGfx = scene.make.graphics({ add: false });
+      soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 80, 80);
+      soilGfx.generateTexture('soilTex', 80, 80);
+
+      // Render Soil Patch in center of screen
+      soilPatch = scene.add.sprite(window.innerWidth / 2, window.innerHeight / 2, 'soilTex').setInteractive();
+      soilPatch.isPlanted = false;
+
+      // Spawn Player
+      player = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 + 150, 'playerTex');
+      player.setCollideWorldBounds(true);
+
+      // Touch-to-move controller for mobile
+      scene.input.on('pointerdown', (pointer) => {
+        // Ignore taps inside HUD or direct taps on soil
+        if (pointer.y > 60) {
+          targetPoint = { x: pointer.x, y: pointer.y };
+        }
+      });
+
+      // Planting & Harvesting Interaction
+      soilPatch.on('pointerdown', () => {
+        const dist = Phaser.Math.Distance.Between(player.x, player.y, soilPatch.x, soilPatch.y);
+
+        // Player must be standing close to plant/harvest
+        if (dist < 100) {
+          if (!soilPatch.isPlanted && playerData.swordSeeds > 0) {
+            // Plant Seed
+            soilPatch.isPlanted = true;
+            playerData.swordSeeds -= 1;
+            savePlayerData(playerData);
+
+            soilPatch.setTint(0xeab308); // Yellow (Growing)
+            document.getElementById('status-info').innerText = 'Status: Seed Growing (3s)...';
+
+            // Growth Timer
+            scene.time.delayedCall(3000, () => {
+              soilPatch.setTint(0x22c55e); // Green (Ready)
+              document.getElementById('status-info').innerText = 'Status: Crop Ready to Harvest!';
+            });
+
+          } else if (soilPatch.isPlanted && soilPatch.tintTopLeft === 0x22c55e) {
+            // Harvest Crop
+            soilPatch.isPlanted = false;
+            soilPatch.clearTint();
+            playerData.inventory.push('Iron Sword');
+            playerData.gold += 15;
+            savePlayerData(playerData);
+            document.getElementById('status-info').innerText = 'Status: Harvested Iron Sword!';
+          }
+        } else {
+          document.getElementById('status-info').innerText = 'Status: Move closer to soil patch!';
+        }
+      });
+
+      updateHUD();
+    }
+
+    function update() {
+      // Smooth movement towards touch point
+      if (targetPoint) {
+        const dist = Phaser.Math.Distance.Between(player.x, player.y, targetPoint.x, targetPoint.y);
+        if (dist > 8) {
+          this.physics.moveTo(player, targetPoint.x, targetPoint.y, 160);
+        } else {
+          player.body.setVelocity(0, 0);
+          targetPoint = null;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
