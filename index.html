@@ -169,7 +169,7 @@
     </div>
   </div>
 
-  <!-- NPC Drag and Drop Loot Modal -->
+  <!-- Corpse Loot Modal -->
   <div id="loot-modal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
@@ -196,7 +196,7 @@
         <h2>🏬 Surface Merchant</h2>
         <button class="close-btn" id="btn-close-shop">✕</button>
       </div>
-      <div class="modal-section">
+      <div class="shop-section">
         <h3>Buy Supplies</h3>
         <div class="shop-row">
           <span>🌰 Sword Seed (🪙 10 Gold)</span>
@@ -212,7 +212,6 @@
 
   <script>
     // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
-    // Inventory stores objects: { name: 'Gold', count: 25 }, { name: 'Sword Seed', count: 3 }, { name: 'Iron Sword' }
     const DEFAULT_DATA = { 
       hp: 100, 
       maxHp: 100, 
@@ -248,7 +247,6 @@
     }
 
     function addPlayerItem(itemName, count = 1) {
-      // Check if stackable item already exists in inventory
       if (itemName === 'Gold' || itemName === 'Sword Seed') {
         let existing = playerData.inventory.find(i => i.name === itemName);
         if (existing) {
@@ -258,17 +256,16 @@
         }
       }
 
-      // Otherwise try to push into new slot if space allows (Max 8 slots)
       if (playerData.inventory.length < 8) {
         if (itemName === 'Gold' || itemName === 'Sword Seed') {
           playerData.inventory.push({ name: itemName, count: count });
         } else {
-          playerData.inventory.push({ name: itemName }); // Swords don't stack
+          playerData.inventory.push({ name: itemName });
         }
         savePlayerData(playerData);
         return true;
       }
-      return false; // Inventory full
+      return false;
     }
 
     function removePlayerItem(itemName, count = 1) {
@@ -336,7 +333,7 @@
         return;
       }
 
-      swords.forEach((item) => {
+      swords.forEach(() => {
         const row = document.createElement('div');
         row.className = 'shop-row';
         row.innerHTML = `<span>⚔️ Iron Sword</span><button class="action-shop-btn sell-btn">Sell (🪙 15)</button>`;
@@ -362,7 +359,6 @@
       npcGrid.innerHTML = '';
       playerGrid.innerHTML = '';
 
-      // Corpse Loot Slots
       activeCorpseLoot.items.forEach((itemObj, idx) => {
         const slot = document.createElement('div');
         slot.className = 'inv-slot filled';
@@ -381,7 +377,6 @@
         npcGrid.innerHTML = '<div style="font-size:10px; color:#64748b; grid-column:span 2;">Empty</div>';
       }
 
-      // Player Inventory Slots inside Loot Screen
       for (let i = 0; i < 6; i++) {
         const slot = document.createElement('div');
         slot.className = 'inv-slot';
@@ -405,7 +400,7 @@
             const looted = activeCorpseLoot.items.splice(data.index, 1)[0];
             let success = addPlayerItem(looted.name, looted.count || 1);
             if (!success) {
-              activeCorpseLoot.items.push(looted); // Return to corpse if inventory full
+              activeCorpseLoot.items.push(looted);
             }
             renderLootGrid();
           }
@@ -547,10 +542,12 @@
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
+      // TRUE TOP-DOWN PLAYER SPRITE (Head circle, torso, shoulders, and sword handle pointing right)
       const playerGfx = scene.make.graphics({ add: false });
-      playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24);
-      playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);
-      playerGfx.fillStyle(0xfbebe8, 1).fillRect(20, 10, 8, 12);
+      playerGfx.fillStyle(0x38bdf8, 1).fillCircle(16, 16, 10); // Torso / Body
+      playerGfx.fillStyle(0xfbebe8, 1).fillCircle(16, 12, 6);  // Head / Hair (Top view)
+      playerGfx.fillStyle(0x1e293b, 1).fillRect(8, 13, 16, 6);  // Shoulders armor band
+      playerGfx.fillStyle(0x94a3b8, 1).fillRect(22, 14, 8, 4);  // Sword handle/blade pointing right
       playerGfx.generateTexture('playerTex', 32, 32);
 
       const slashGfx = scene.make.graphics({ add: false });
@@ -560,17 +557,17 @@
       slashGfx.generateTexture('slashTex', 48, 48);
 
       const enemyGfx = scene.make.graphics({ add: false });
-      enemyGfx.fillStyle(0xef4444, 1).fillRect(4, 4, 24, 24);
-      enemyGfx.fillStyle(0xfbbf24, 1).fillRect(8, 8, 16, 8);
+      enemyGfx.fillStyle(0xef4444, 1).fillCircle(16, 16, 10);
+      enemyGfx.fillStyle(0xfbbf24, 1).fillCircle(16, 12, 5);
       enemyGfx.generateTexture('enemyTex', 32, 32);
 
       const corpseGfx = scene.make.graphics({ add: false });
-      corpseGfx.fillStyle(0x475569, 1).fillRect(4, 12, 24, 12);
+      corpseGfx.fillStyle(0x475569, 1).fillCircle(16, 16, 10);
       corpseGfx.generateTexture('corpseTex', 32, 32);
 
       const merchantGfx = scene.make.graphics({ add: false });
-      merchantGfx.fillStyle(0x8b5cf6, 1).fillRect(4, 0, 24, 12);
-      merchantGfx.fillStyle(0xeab308, 1).fillRect(4, 12, 24, 20);
+      merchantGfx.fillStyle(0x8b5cf6, 1).fillCircle(16, 16, 11);
+      merchantGfx.fillStyle(0xeab308, 1).fillCircle(16, 12, 6);
       merchantGfx.generateTexture('merchantTex', 32, 32);
 
       const doorGfx = scene.make.graphics({ add: false });
@@ -841,7 +838,6 @@
               if (mob.hpBar) mob.hpBar.destroy();
               let corpse = scene.physics.add.sprite(mob.x, mob.y, 'corpseTex').setDepth(1);
               
-              // Generated Corpse Loot Stacks
               corpse.items = [
                 { name: 'Gold', count: Phaser.Math.Between(10, 20) },
                 { name: Math.random() > 0.4 ? 'Sword Seed' : 'Iron Sword', count: 1 }
