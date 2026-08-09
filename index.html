@@ -4,10 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   
-  <!-- Web App Manifest (Landscape Mode) -->
   <link rel="manifest" href='data:application/manifest+json,{"name":"SEW","short_name":"SEW","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"landscape"}' />
-  
-  <!-- iOS Standalone Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="SEW" />
@@ -19,255 +16,154 @@
   <style>
     * {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
-
     html, body {
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
-      position: fixed;
-      top: 0;
-      left: 0;
-      background-color: #0f172a;
-      color: #fff;
+      width: 100vw; height: 100vh; height: 100dvh;
+      overflow: hidden; position: fixed; top: 0; left: 0;
+      background-color: #0f172a; color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       touch-action: none;
     }
-
     canvas { display: block; }
 
     /* Rotate Phone Warning */
     #rotate-screen {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
+      display: none; position: fixed; top: 0; left: 0;
       width: 100vw; height: 100vh; height: 100dvh;
-      background: #0f172a; color: #38bdf8;
-      z-index: 100;
-      flex-direction: column;
-      justify-content: center; align-items: center;
-      text-align: center; padding: 24px;
-      font-size: 18px; font-weight: bold;
+      background: #0f172a; color: #38bdf8; z-index: 100;
+      flex-direction: column; justify-content: center; align-items: center;
+      text-align: center; padding: 24px; font-size: 18px; font-weight: bold;
     }
     #rotate-screen span { font-size: 48px; margin-bottom: 12px; }
     @media (orientation: portrait) { #rotate-screen { display: flex; } }
 
     /* HUD Bar */
     #hud {
-      position: fixed;
-      top: 12px; left: 20px; right: 20px;
-      z-index: 10;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      position: fixed; top: 12px; left: 20px; right: 20px;
+      z-index: 10; display: flex; justify-content: space-between; align-items: center;
       pointer-events: none;
     }
     .hud-box {
-      background: rgba(15, 23, 42, 0.85);
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: bold;
+      background: rgba(15, 23, 42, 0.85); border: 2px solid rgba(255, 255, 255, 0.15);
+      padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: bold;
       backdrop-filter: blur(4px);
     }
     .hud-btn {
-      pointer-events: auto;
-      background: rgba(56, 189, 248, 0.2);
-      border: 2px solid #38bdf8;
-      color: #fff;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: bold;
-      cursor: pointer;
+      pointer-events: auto; background: rgba(56, 189, 248, 0.2);
+      border: 2px solid #38bdf8; color: #fff; padding: 6px 12px;
+      border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer;
       backdrop-filter: blur(4px);
     }
     .hud-btn:active { background: rgba(56, 189, 248, 0.6); }
 
     /* Dialogue Box */
     #dialogue-box {
-      position: fixed;
-      top: 48px; left: 20%; right: 20%;
-      z-index: 10;
-      background: rgba(15, 23, 42, 0.9);
-      border: 2px solid #38bdf8;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      color: #e2e8f0;
-      pointer-events: none;
-      text-align: center;
+      position: fixed; top: 48px; left: 20%; right: 20%;
+      z-index: 10; background: rgba(15, 23, 42, 0.9);
+      border: 2px solid #38bdf8; padding: 8px 12px; border-radius: 8px;
+      font-size: 12px; color: #e2e8f0; pointer-events: none; text-align: center;
     }
 
     /* Controls Overlay */
     #controls {
-      position: fixed;
-      bottom: 20px; left: 20px; right: 20px;
-      height: 120px;
-      z-index: 20;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      pointer-events: none;
+      position: fixed; bottom: 20px; left: 20px; right: 20px;
+      height: 120px; z-index: 20; display: flex; justify-content: space-between;
+      align-items: center; pointer-events: none;
     }
 
-    /* Virtual Analog Joystick */
+    /* Virtual Joystick */
     #joystick-zone {
-      width: 110px;
-      height: 110px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      position: relative;
-      pointer-events: auto;
-      touch-action: none;
-      backdrop-filter: blur(4px);
+      width: 110px; height: 110px; background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+      position: relative; pointer-events: auto; touch-action: none; backdrop-filter: blur(4px);
     }
     #joystick-knob {
-      width: 44px;
-      height: 44px;
-      background: rgba(56, 189, 248, 0.8);
-      border: 2px solid #ffffff;
-      border-radius: 50%;
-      position: absolute;
-      top: 33px; left: 33px;
-      pointer-events: none;
-      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      width: 44px; height: 44px; background: rgba(56, 189, 248, 0.8);
+      border: 2px solid #ffffff; border-radius: 50%; position: absolute;
+      top: 33px; left: 33px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
     }
 
     /* Action Button "A" */
     .action-btn {
-      width: 65px;
-      height: 65px;
-      border-radius: 50%;
-      background: rgba(34, 197, 94, 0.4);
-      border: 3px solid rgba(34, 197, 94, 0.8);
-      color: #fff;
-      font-size: 22px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: auto;
-      backdrop-filter: blur(4px);
+      width: 65px; height: 65px; border-radius: 50%;
+      background: rgba(34, 197, 94, 0.4); border: 3px solid rgba(34, 197, 94, 0.8);
+      color: #fff; font-size: 22px; font-weight: bold; display: flex;
+      align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(4px);
     }
     .action-btn:active { background: rgba(34, 197, 94, 0.8); transform: scale(0.95); }
 
-    /* Inventory Modal Screen */
-    #inventory-modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0;
+    /* Modals */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0;
       width: 100vw; height: 100vh; height: 100dvh;
-      background: rgba(15, 23, 42, 0.85);
-      backdrop-filter: blur(8px);
-      z-index: 50;
-      justify-content: center;
-      align-items: center;
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
+      z-index: 50; justify-content: center; align-items: center;
     }
-    .inv-card {
-      width: 80%;
-      max-width: 480px;
-      background: #1e293b;
-      border: 2px solid #38bdf8;
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+    .modal-card {
+      width: 85%; max-width: 500px; background: #1e293b;
+      border: 2px solid #38bdf8; border-radius: 12px; padding: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 12px;
     }
-    .inv-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #334155;
-      padding-bottom: 8px;
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid #334155; padding-bottom: 8px;
     }
-    .inv-header h2 { font-size: 16px; color: #38bdf8; }
-    .inv-close-btn {
-      background: #ef4444;
-      border: none;
-      color: #fff;
-      font-weight: bold;
-      padding: 4px 10px;
-      border-radius: 6px;
-      cursor: pointer;
+    .modal-header h2 { font-size: 16px; color: #38bdf8; }
+    .close-btn {
+      background: #ef4444; border: none; color: #fff; font-weight: bold;
+      padding: 4px 10px; border-radius: 6px; cursor: pointer;
     }
-    .inv-stats {
-      display: flex;
-      gap: 16px;
-      font-size: 13px;
-      background: #0f172a;
-      padding: 8px 12px;
-      border-radius: 6px;
-    }
-    .inv-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      max-height: 180px;
-      overflow-y: auto;
-    }
+    .modal-stats { display: flex; gap: 16px; font-size: 13px; background: #0f172a; padding: 8px 12px; border-radius: 6px; }
+
+    .inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 180px; overflow-y: auto; }
     .inv-slot {
-      aspect-ratio: 1;
-      background: #0f172a;
-      border: 1px dashed #475569;
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      text-align: center;
-      padding: 4px;
-      color: #cbd5e1;
+      aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-size: 11px; text-align: center; padding: 4px; color: #cbd5e1;
     }
-    .inv-slot.filled {
-      border: 1px solid #38bdf8;
-      background: rgba(56, 189, 248, 0.1);
+    .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
+
+    .shop-section { display: flex; flex-direction: column; gap: 8px; }
+    .shop-section h3 { font-size: 13px; color: #f1f5f9; border-bottom: 1px dashed #334155; padding-bottom: 4px; }
+    .shop-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: #0f172a; padding: 8px 12px; border-radius: 6px; border: 1px solid #334155; font-size: 12px;
     }
+    .action-shop-btn { background: #22c55e; border: none; color: #fff; font-weight: bold; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    .sell-btn { background: #eab308; color: #0f172a; }
   </style>
 </head>
 <body>
 
-  <!-- Orientation Screen -->
   <div id="rotate-screen">
     <span>🔄</span>
     Please rotate your phone to Landscape mode to play SEW!
   </div>
 
-  <!-- HUD Overlay -->
   <div id="hud">
-    <div class="hud-box" id="stash-info">Gold: 🪙 0 | Seeds: 🌰 3</div>
+    <div class="hud-box" id="stash-info">Location: Surface Hub | Gold: 🪙 0 | Seeds: 🌰 3</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
-  <div id="dialogue-box">Walk up to the tilled soil patch and press [A] to plant!</div>
+  <div id="dialogue-box">Surface Hub: Walk up to the Dungeon Door, Soil, or Merchant and press [A]!</div>
 
-  <!-- Controls -->
   <div id="controls">
-    <div id="joystick-zone">
-      <div id="joystick-knob"></div>
-    </div>
+    <div id="joystick-zone"><div id="joystick-knob"></div></div>
     <div class="action-btn" id="btn-action">A</div>
   </div>
 
   <!-- Inventory Modal -->
-  <div id="inventory-modal">
-    <div class="inv-card">
-      <div class="inv-header">
+  <div id="inventory-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
         <h2>🎒 Stash & Inventory</h2>
-        <button class="inv-close-btn" id="btn-close-inv">✕</button>
+        <button class="close-btn" id="btn-close-inv">✕</button>
       </div>
-      <div class="inv-stats">
+      <div class="modal-stats">
         <span id="inv-gold">Gold: 🪙 0</span>
         <span id="inv-seeds">Seeds: 🌰 0</span>
       </div>
@@ -275,15 +171,38 @@
     </div>
   </div>
 
-  <script>
-    // --- 1. LOCAL STORAGE PERSISTENCE ---
-    const DEFAULT_DATA = { gold: 25, seeds: 3, inventory: [] };
+  <!-- Merchant Shop Modal -->
+  <div id="shop-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>🏬 Surface Merchant</h2>
+        <button class="close-btn" id="btn-close-shop">✕</button>
+      </div>
+      <div class="modal-stats">
+        <span id="shop-gold">Gold: 🪙 0</span>
+        <span id="shop-seeds">Seeds: 🌰 0</span>
+      </div>
+      <div class="shop-section">
+        <h3>Buy Supplies</h3>
+        <div class="shop-row">
+          <span>🌰 Sword Seed (🪙 10 Gold)</span>
+          <button class="action-shop-btn" id="btn-buy-seed">Buy Seed</button>
+        </div>
+      </div>
+      <div class="shop-section">
+        <h3>Sell Harvested Gear</h3>
+        <div id="shop-sell-list" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;"></div>
+      </div>
+    </div>
+  </div>
 
+  <script>
+    // --- 1. LOCAL STORAGE ---
+    const DEFAULT_DATA = { gold: 25, seeds: 3, inventory: [] };
     function getPlayerData() {
       const saved = localStorage.getItem('SEW_SAVE_DATA');
       return saved ? JSON.parse(saved) : DEFAULT_DATA;
     }
-
     function savePlayerData(data) {
       localStorage.setItem('SEW_SAVE_DATA', JSON.stringify(data));
       updateUI();
@@ -291,60 +210,91 @@
 
     let playerData = getPlayerData();
     let isInventoryOpen = false;
+    let isShopOpen = false;
+    let currentZone = 'HUB';
 
     function updateUI() {
-      document.getElementById('stash-info').innerHTML = `Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
+      document.getElementById('stash-info').innerHTML = 
+        `Zone: ${currentZone === 'HUB' ? '🏡 Surface Hub' : '⚔️ Subterranean Dungeon Layer'} | Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
     }
 
-    // --- 2. INVENTORY MODAL SYSTEM ---
+    // --- 2. MODAL MANAGERS ---
     const invModal = document.getElementById('inventory-modal');
+    const shopModal = document.getElementById('shop-modal');
     const invGrid = document.getElementById('inv-grid');
+    const shopSellList = document.getElementById('shop-sell-list');
 
     function toggleInventory(show) {
       isInventoryOpen = show;
       invModal.style.display = show ? 'flex' : 'none';
-
       if (show) {
         document.getElementById('inv-gold').innerText = `Gold: 🪙 ${playerData.gold}`;
         document.getElementById('inv-seeds').innerText = `Seeds: 🌰 ${playerData.seeds}`;
         invGrid.innerHTML = '';
-
-        // Render 8 Inventory Slots
-        const totalSlots = 8;
-        for (let i = 0; i < totalSlots; i++) {
+        for (let i = 0; i < 8; i++) {
           const slot = document.createElement('div');
           slot.className = 'inv-slot';
           if (playerData.inventory[i]) {
             slot.classList.add('filled');
             slot.innerHTML = `⚔️<br>${playerData.inventory[i]}`;
-          } else {
-            slot.innerText = 'Empty';
-          }
+          } else { slot.innerText = 'Empty'; }
           invGrid.appendChild(slot);
         }
       }
     }
 
-    document.getElementById('btn-bag').addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      toggleInventory(true);
-    });
-    document.getElementById('btn-close-inv').addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      toggleInventory(false);
+    function toggleShop(show) {
+      isShopOpen = show;
+      shopModal.style.display = show ? 'flex' : 'none';
+      if (show) refreshShopUI();
+    }
+
+    function refreshShopUI() {
+      document.getElementById('shop-gold').innerText = `Gold: 🪙 ${playerData.gold}`;
+      document.getElementById('shop-seeds').innerText = `Seeds: 🌰 ${playerData.seeds}`;
+      shopSellList.innerHTML = '';
+      if (playerData.inventory.length === 0) {
+        shopSellList.innerHTML = `<div class="shop-row" style="color: #94a3b8;">No weapons in inventory to sell.</div>`;
+        return;
+      }
+      playerData.inventory.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'shop-row';
+        row.innerHTML = `<span>⚔️ ${item}</span><button class="action-shop-btn sell-btn">Sell (🪙 15)</button>`;
+        row.querySelector('.sell-btn').addEventListener('click', () => {
+          playerData.inventory.splice(index, 1);
+          playerData.gold += 15;
+          savePlayerData(playerData);
+          refreshShopUI();
+        });
+        shopSellList.appendChild(row);
+      });
+    }
+
+    document.getElementById('btn-buy-seed').addEventListener('click', () => {
+      if (playerData.gold >= 10) {
+        playerData.gold -= 10;
+        playerData.seeds += 1;
+        savePlayerData(playerData);
+        refreshShopUI();
+      }
     });
 
-    // --- 3. VIRTUAL JOYSTICK LOGIC ---
+    document.getElementById('btn-bag').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(true); });
+    document.getElementById('btn-close-inv').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(false); });
+    document.getElementById('btn-close-shop').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleShop(false); });
+
+    // --- 3. VIRTUAL JOYSTICK ---
     let joystickVector = { x: 0, y: 0 };
     let joystickActive = false;
     let joystickTouchId = null;
 
     const jZone = document.getElementById('joystick-zone');
     const jKnob = document.getElementById('joystick-knob');
-    const maxRadius = 35; // Maximum displacement radius
+    const maxRadius = 35;
 
     jZone.addEventListener('touchstart', (e) => {
-      if (isInventoryOpen) return;
+      if (isInventoryOpen || isShopOpen) return;
       e.preventDefault();
       const touch = e.changedTouches[0];
       joystickTouchId = touch.identifier;
@@ -374,7 +324,6 @@
         }
       }
     };
-
     jZone.addEventListener('touchend', endJoystick);
     jZone.addEventListener('touchcancel', endJoystick);
 
@@ -382,7 +331,6 @@
       const rect = jZone.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-
       let dx = touch.clientX - centerX;
       let dy = touch.clientY - centerY;
       let distance = Math.sqrt(dx * dx + dy * dy);
@@ -390,33 +338,27 @@
       if (distance > maxRadius) {
         dx = (dx / distance) * maxRadius;
         dy = (dy / distance) * maxRadius;
-        distance = maxRadius;
       }
-
       jKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-      // Normalized Vector (-1.0 to 1.0)
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE ---
-    let player, cursors, soilPatch, currentSoilState = 'EMPTY';
+    // --- 4. PHASER 3 ENGINE & MAP BUILDER ---
+    let player, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
+    let dungeonWalls, dungeonFloorTiles = [];
+    let currentSoilState = 'EMPTY';
     const SPEED = 150;
-    const WORLD_WIDTH = 1600;
-    const WORLD_HEIGHT = 1200;
+    const TILE_SIZE = 32;
+    const MAP_GRID_SIZE = 40;
+    const WORLD_SIZE = MAP_GRID_SIZE * TILE_SIZE;
 
     const config = {
       type: Phaser.AUTO,
       width: window.innerWidth,
       height: window.innerHeight,
       pixelArt: true,
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-      },
-      physics: {
-        default: 'arcade',
-        arcade: { gravity: { y: 0 }, debug: false }
-      },
+      scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+      physics: { default: 'arcade', arcade: { gravity: { y: 0 }, debug: false } },
       scene: { create, update }
     };
 
@@ -424,20 +366,23 @@
 
     function create() {
       const scene = this;
+      scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-      scene.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+      // PROCEDURAL GRAPHICS
+      const grassGfx = scene.make.graphics({ add: false });
+      grassGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 32, 32);
+      grassGfx.lineStyle(1, 0x1e293b, 0.5).strokeRect(0, 0, 32, 32);
+      grassGfx.generateTexture('hubTile', 32, 32);
 
-      // Procedural Textures
-      const tileGfx = scene.make.graphics({ add: false });
-      tileGfx.fillStyle(0x1e293b, 1).fillRect(0, 0, 32, 32);
-      tileGfx.lineStyle(1, 0x334155, 0.5).strokeRect(0, 0, 32, 32);
-      tileGfx.generateTexture('floorTile', 32, 32);
+      const dungGfx = scene.make.graphics({ add: false });
+      dungGfx.fillStyle(0x334155, 1).fillRect(0, 0, 32, 32);
+      dungGfx.lineStyle(1, 0x475569, 0.5).strokeRect(0, 0, 32, 32);
+      dungGfx.generateTexture('dungeonTile', 32, 32);
 
-      for (let x = 0; x < WORLD_WIDTH; x += 32) {
-        for (let y = 0; y < WORLD_HEIGHT; y += 32) {
-          scene.add.image(x + 16, y + 16, 'floorTile');
-        }
-      }
+      const wallTexGfx = scene.make.graphics({ add: false });
+      wallTexGfx.fillStyle(0x64748b, 1).fillRect(0, 0, 32, 32);
+      wallTexGfx.lineStyle(2, 0x0f172a, 0.8).strokeRect(0, 0, 32, 32);
+      wallTexGfx.generateTexture('wallTile', 32, 32);
 
       const soilGfx = scene.make.graphics({ add: false });
       soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
@@ -450,12 +395,38 @@
       playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);
       playerGfx.generateTexture('playerTex', 32, 32);
 
-      soilPatch = scene.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 'soilTex');
-      player = scene.physics.add.sprite(WORLD_WIDTH / 2 - 80, WORLD_HEIGHT / 2, 'playerTex');
+      const merchantGfx = scene.make.graphics({ add: false });
+      merchantGfx.fillStyle(0x8b5cf6, 1).fillRect(4, 0, 24, 12);
+      merchantGfx.fillStyle(0xeab308, 1).fillRect(4, 12, 24, 20);
+      merchantGfx.generateTexture('merchantTex', 32, 32);
+
+      // Surface Dungeon Door (Wooden Frame + Brass Knob)
+      const doorGfx = scene.make.graphics({ add: false });
+      doorGfx.fillStyle(0x451a03, 1).fillRect(0, 0, 40, 48);  // Outer Stone/Wood Arch
+      doorGfx.fillStyle(0x78350f, 1).fillRect(4, 4, 32, 40);  // Inner Door Panel
+      doorGfx.lineStyle(2, 0x271003, 1).strokeRect(4, 4, 32, 40);
+      doorGfx.fillStyle(0xeab308, 1).fillCircle(12, 26, 3);   // Doorknob
+      doorGfx.generateTexture('doorTex', 40, 48);
+
+      // Dungeon Exit Door (Iron Frame + Green Glow)
+      const exitGfx = scene.make.graphics({ add: false });
+      exitGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 40, 48);  // Dark Frame
+      exitGfx.fillStyle(0x15803d, 1).fillRect(4, 4, 32, 40);  // Green Door Panel
+      exitGfx.lineStyle(2, 0x22c55e, 1).strokeRect(4, 4, 32, 40);
+      exitGfx.fillStyle(0x86efac, 1).fillCircle(12, 26, 3);   // Glow Doorknob
+      exitGfx.generateTexture('exitDoorTex', 40, 48);
+
+      dungeonWalls = scene.physics.add.staticGroup();
+
+      buildHubMap(scene);
+
+      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
       player.setCollideWorldBounds(true);
 
-      // Camera Tracking
-      scene.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+      scene.physics.add.collider(player, merchant);
+      scene.physics.add.collider(player, dungeonWalls);
+
+      scene.cameras.main.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
       scene.cameras.main.startFollow(player, true, 0.1, 0.1);
       scene.cameras.main.setDeadzone(window.innerWidth * 0.3, window.innerHeight * 0.3);
 
@@ -474,55 +445,176 @@
       updateUI();
     }
 
-    function handleInteraction(scene) {
-      if (isInventoryOpen) return;
-      const dist = Phaser.Math.Distance.Between(player.x, player.y, soilPatch.x, soilPatch.y);
-      const dialogue = document.getElementById('dialogue-box');
+    // --- HUB OVERWORLD CREATION ---
+    function buildHubMap(scene) {
+      currentZone = 'HUB';
+      clearDungeon(scene);
 
-      if (dist > 65) {
-        dialogue.innerText = "You're too far away from the soil patch!";
-        return;
+      for (let x = 0; x < WORLD_SIZE; x += 32) {
+        for (let y = 0; y < WORLD_SIZE; y += 32) {
+          dungeonFloorTiles.push(scene.add.image(x + 16, y + 16, 'hubTile'));
+        }
       }
 
-      if (currentSoilState === 'EMPTY') {
-        if (playerData.seeds > 0) {
-          playerData.seeds -= 1;
-          savePlayerData(playerData);
+      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'soilTex');
+      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'merchantTex');
+      merchant.setImmovable(true);
+      
+      // Spawn Entrance Doorway
+      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'doorTex');
 
-          currentSoilState = 'GROWING';
-          soilPatch.setTint(0xeab308);
-          dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Walk up to the Dungeon Door and press [A] to enter layer!";
+      updateUI();
+    }
 
-          scene.time.delayedCall(3000, () => {
-            currentSoilState = 'READY';
-            soilPatch.setTint(0x22c55e);
-            dialogue.innerText = "The Sword Crop has fully grown! Press [A] to harvest!";
-          });
-        } else {
-          dialogue.innerText = "You have no seeds left to plant!";
+    // --- PROCEDURAL DUNGEON GENERATOR ---
+    function generateDungeon(scene) {
+      currentZone = 'DUNGEON';
+      clearHub(scene);
+
+      let grid = Array(MAP_GRID_SIZE).fill(null).map(() => Array(MAP_GRID_SIZE).fill(1));
+      let rooms = [];
+      const numRooms = 6;
+
+      for (let i = 0; i < numRooms; i++) {
+        let w = Phaser.Math.Between(5, 8);
+        let h = Phaser.Math.Between(5, 8);
+        let x = Phaser.Math.Between(2, MAP_GRID_SIZE - w - 2);
+        let y = Phaser.Math.Between(2, MAP_GRID_SIZE - h - 2);
+
+        let overlap = rooms.some(r => !(x + w < r.x || x > r.x + r.w || y + h < r.y || y > r.y + r.h));
+        if (!overlap) {
+          rooms.push({ x, y, w, h, cx: Math.floor(x + w / 2), cy: Math.floor(y + h / 2) });
+          for (let rx = x; rx < x + w; rx++) {
+            for (let ry = y; ry < y + h; ry++) {
+              grid[ry][rx] = 0;
+            }
+          }
         }
-      } else if (currentSoilState === 'READY') {
-        currentSoilState = 'EMPTY';
-        soilPatch.clearTint();
-        playerData.inventory.push('Iron Sword');
-        playerData.gold += 15;
-        savePlayerData(playerData);
-        dialogue.innerText = "Harvested an Iron Sword! Check your Inventory [🎒].";
-      } else if (currentSoilState === 'GROWING') {
-        dialogue.innerText = "Patience! The plant is still growing...";
+      }
+
+      for (let i = 0; i < rooms.length - 1; i++) {
+        let r1 = rooms[i];
+        let r2 = rooms[i + 1];
+        let cx = r1.cx;
+        let cy = r1.cy;
+
+        while (cx !== r2.cx) {
+          grid[cy][cx] = 0;
+          cx += (r2.cx > cx) ? 1 : -1;
+        }
+        while (cy !== r2.cy) {
+          grid[cy][cx] = 0;
+          cy += (r2.cy > cy) ? 1 : -1;
+        }
+      }
+
+      for (let y = 0; y < MAP_GRID_SIZE; y++) {
+        for (let x = 0; x < MAP_GRID_SIZE; x++) {
+          let px = x * TILE_SIZE + TILE_SIZE / 2;
+          let py = y * TILE_SIZE + TILE_SIZE / 2;
+
+          if (grid[y][x] === 0) {
+            dungeonFloorTiles.push(scene.add.image(px, py, 'dungeonTile'));
+          } else {
+            let wall = dungeonWalls.create(px, py, 'wallTile');
+            wall.refreshBody();
+          }
+        }
+      }
+
+      // Player spawns inside Room 0
+      let startRoom = rooms[0];
+      player.setPosition(startRoom.cx * TILE_SIZE, startRoom.cy * TILE_SIZE);
+
+      // Exit Door spawns inside last Room
+      let lastRoom = rooms[rooms.length - 1];
+      exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex');
+
+      document.getElementById('dialogue-box').innerText = "Dungeon Layer Entered! Explore rooms and find the Exit Door to return to the Hub.";
+      updateUI();
+    }
+
+    function clearHub(scene) {
+      if (hubSoil) { hubSoil.destroy(); hubSoil = null; }
+      if (merchant) { merchant.destroy(); merchant = null; }
+      if (dungeonDoor) { dungeonDoor.destroy(); dungeonDoor = null; }
+      dungeonFloorTiles.forEach(t => t.destroy());
+      dungeonFloorTiles = [];
+    }
+
+    function clearDungeon(scene) {
+      if (exitDoor) { exitDoor.destroy(); exitDoor = null; }
+      dungeonWalls.clear(true, true);
+      dungeonFloorTiles.forEach(t => t.destroy());
+      dungeonFloorTiles = [];
+    }
+
+    // --- INTERACTION LOGIC ---
+    function handleInteraction(scene) {
+      if (isInventoryOpen || isShopOpen) return;
+      const dialogue = document.getElementById('dialogue-box');
+
+      if (currentZone === 'HUB') {
+        const distDoor = Phaser.Math.Distance.Between(player.x, player.y, dungeonDoor.x, dungeonDoor.y);
+        const distMerchant = Phaser.Math.Distance.Between(player.x, player.y, merchant.x, merchant.y);
+        const distSoil = Phaser.Math.Distance.Between(player.x, player.y, hubSoil.x, hubSoil.y);
+
+        // Enter Dungeon via Door
+        if (distDoor <= 65) {
+          generateDungeon(scene);
+          return;
+        }
+
+        if (distMerchant <= 75) {
+          dialogue.innerText = "Welcome to the Merchant Shop!";
+          toggleShop(true);
+          return;
+        }
+
+        if (distSoil <= 65) {
+          if (currentSoilState === 'EMPTY') {
+            if (playerData.seeds > 0) {
+              playerData.seeds -= 1;
+              savePlayerData(playerData);
+              currentSoilState = 'GROWING';
+              hubSoil.setTint(0xeab308);
+              dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
+              scene.time.delayedCall(3000, () => {
+                currentSoilState = 'READY';
+                hubSoil.setTint(0x22c55e);
+                dialogue.innerText = "The Sword Crop has fully grown! Press [A] to harvest!";
+              });
+            } else { dialogue.innerText = "You have no seeds left! Visit the Merchant to buy more."; }
+          } else if (currentSoilState === 'READY') {
+            currentSoilState = 'EMPTY';
+            hubSoil.clearTint();
+            playerData.inventory.push('Iron Sword');
+            playerData.gold += 15;
+            savePlayerData(playerData);
+            dialogue.innerText = "Harvested an Iron Sword! Sell it to the Merchant for Gold.";
+          }
+          return;
+        }
+      } else if (currentZone === 'DUNGEON') {
+        const distExit = Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y);
+        // Exit Dungeon via Exit Door
+        if (distExit <= 65) {
+          buildHubMap(scene);
+          player.setPosition(WORLD_SIZE / 2, WORLD_SIZE / 2);
+          return;
+        }
+        dialogue.innerText = "Find the Green Exit Door in the final room to extract!";
       }
     }
 
     function update() {
       player.body.setVelocity(0);
+      if (isInventoryOpen || isShopOpen) return;
 
-      if (isInventoryOpen) return;
-
-      // Handle Virtual Joystick Vector
       if (joystickActive) {
         player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
       } else {
-        // Fallback Arrow Key Controls (PC)
         if (cursors.left.isDown) player.body.setVelocityX(-SPEED);
         else if (cursors.right.isDown) player.body.setVelocityX(SPEED);
 
