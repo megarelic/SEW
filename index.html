@@ -153,11 +153,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.7</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.8</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: You can now drop items on the ground from your inventory!</div>
+  <div id="dialogue-box">Surface Hub: Player at (0,7), Enemy at (0,9) mapped successfully!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -222,7 +222,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.7';
+    const GAME_VERSION = 'v1.4.8';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -255,6 +255,13 @@
     let activeCorpseLoot = null;
     let currentZone = 'HUB';
     const MAX_INVENTORY_SLOTS = 16;
+
+    // Tilemap layout: 16x16 grid columns. Let's assume standard 16 columns wide based on visual tilemap
+    const TILEMAP_COLUMNS = 16;
+    // Player at (0, 7) -> row 7, col 0 => index = 7 * 16 + 0 = 112
+    const TILE_PLAYER = 7 * TILEMAP_COLUMNS + 0;
+    // Enemy at (0, 9) -> row 9, col 0 => index = 9 * 16 + 0 = 144
+    const TILE_ENEMY = 9 * TILEMAP_COLUMNS + 0;
 
     function getPlayerItemCount(itemName) {
       let total = 0;
@@ -350,7 +357,6 @@
             else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
             else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
 
-            // Add drop button to slot
             const dropBtn = document.createElement('button');
             dropBtn.className = 'drop-slot-btn';
             dropBtn.innerText = 'Drop';
@@ -385,7 +391,6 @@
 
       const scene = game.scene.scenes[0];
       if (scene && player) {
-        // Spawn world ground drop item
         let groundItem = scene.physics.add.sprite(player.x + Phaser.Math.Between(-15, 15), player.y + Phaser.Math.Between(-15, 15), 'tiles', 130);
         groundItem.setScale(1.5);
         groundItem.setDepth(1);
@@ -591,7 +596,7 @@
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & WORLD DROPS ---
+    // --- 4. PHASER 3 ENGINE & MAP SPRITES ---
     let player, aimReticle, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
@@ -617,7 +622,7 @@
 
     const config = {
       type: Phaser.AUTO,
-      width: window.innerHeight > window.innerWidth ? window.innerWidth : window.innerWidth,
+      width: window.innerWidth,
       height: window.innerHeight,
       pixelArt: true,
       scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
@@ -654,7 +659,8 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'tiles', 113);
+      // Player sprite at (0,7)
+      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'tiles', TILE_PLAYER);
       player.setScale(2);
       player.setCollideWorldBounds(true);
       player.setDepth(10);
@@ -702,7 +708,6 @@
         let worldPoint = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
         const dialogue = document.getElementById('dialogue-box');
 
-        // Check World Ground Drop Pickup
         for (let i = worldGroundDrops.length - 1; i >= 0; i--) {
           let drop = worldGroundDrops[i];
           if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, drop.x, drop.y) <= 24) {
@@ -869,7 +874,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Drop items on ground via Inventory [Drop] button!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Player at (0,7), Enemy at (0,9) active!";
       updateUI();
     }
 
@@ -955,7 +960,8 @@
         let rm = rooms[i];
         if (rm === startRoom) continue;
 
-        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'tiles', 128);
+        // Enemy sprite at (0,9)
+        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'tiles', TILE_ENEMY);
         enemy.setScale(2);
         enemy.maxHp = 40;
         enemy.hp = 40;
