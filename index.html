@@ -42,7 +42,7 @@
 
     #hud {
       position: fixed; top: 12px; left: 16px; right: 16px;
-      z-index: 10; display: flex; justify-space-between; align-items: center;
+      z-index: 10; display: flex; justify-content: space-between; align-items: center;
       pointer-events: none;
     }
     .hud-box {
@@ -153,11 +153,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.5.3</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.5.4</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Top and bottom wall tiles swapped (v1.5.3)!</div>
+  <div id="dialogue-box">Surface Hub: Sample-Accurate Wall Tiling (v1.5.4) Active!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -222,7 +222,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.5.3';
+    const GAME_VERSION = 'v1.5.4';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -647,23 +647,23 @@
       const scene = this;
       scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-      // Extract exact tilemap textures (across, down)
+      // Extract exact tilemap textures (across, down) based on sample verification
       extractTileTexture(scene, 'playerTex', 0, 7);       // Player at (0,7)
       extractTileTexture(scene, 'enemyTex', 0, 9);        // Enemy at (0,9)
       
-      // Swapped Top & Bottom Wall Tiles Mapping
-      extractTileTexture(scene, 'wallVoidTex', 0, 0);     // Void (0,0)
-      extractTileTexture(scene, 'wallTopTex', 4, 3);      // Top wall (4,3) - SWAPPED
-      extractTileTexture(scene, 'wallBottomTex', 2, 0);   // Bottom wall (2,0) - SWAPPED
-      extractTileTexture(scene, 'wallRightTex', 3, 1);    // Right wall (3,1)
-      extractTileTexture(scene, 'wallLeftTex', 1, 1);     // Left wall (1,1)
-      extractTileTexture(scene, 'wallTRCornerTex', 1, 2); // Top-Right Corner (1,2)
-      extractTileTexture(scene, 'wallTLCornerTex', 3, 2); // Top-Left Corner (3,2)
-      extractTileTexture(scene, 'wallBRCornerTex', 3, 0); // Bottom-Right Corner (3,0)
+      // Verified Wall & Corner Tiles Mapping
+      extractTileTexture(scene, 'wallVoidTex', 0, 0);     // Void fill (0,0)
+      extractTileTexture(scene, 'wallTopTex', 7, 3);      // Top wall (7,3)
+      extractTileTexture(scene, 'wallBottomTex', 7, 2);   // Bottom wall (7,2)
+      extractTileTexture(scene, 'wallLeftTex', 6, 3);     // Left wall (6,3)
+      extractTileTexture(scene, 'wallRightTex', 8, 3);    // Right wall (8,3)
+      extractTileTexture(scene, 'wallTLCornerTex', 6, 2); // Top-Left Corner (6,2)
+      extractTileTexture(scene, 'wallTRCornerTex', 8, 2); // Top-Right Corner (8,2)
       extractTileTexture(scene, 'wallBLCornerTex', 1, 0); // Bottom-Left Corner (1,0)
+      extractTileTexture(scene, 'wallBRCornerTex', 3, 0); // Bottom-Right Corner (3,0)
 
       extractTileTexture(scene, 'hubFloorTex', 0, 4);     // Hub ground
-      extractTileTexture(scene, 'dungFloorTex', 1, 4);    // Dungeon ground
+      extractTileTexture(scene, 'dungFloorTex', 1, 4);    // Dungeon floor (1,4)
       extractTileTexture(scene, 'soilTex', 2, 5);         // Soil plot
       extractTileTexture(scene, 'merchantTex', 1, 7);     // Merchant NPC
       extractTileTexture(scene, 'doorTex', 6, 0);         // Dungeon Door
@@ -897,7 +897,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Top and Bottom Walls Swapped!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Ready to enter Dungeon!";
       updateUI();
     }
 
@@ -939,7 +939,7 @@
         }
         while (cy !== r2.cy) {
           dungeonGrid[cy][cx] = 0;
-          if (cx + 1 < MAP_GRID_SIZE - 1) dungeonGrid[cy + 1][cx] = 0;
+          if (cx + 1 < MAP_GRID_SIZE - 1) dungeonGrid[cy][cx + 1] = 0;
           cy += (r2.cy > cy) ? 1 : -1;
         }
       }
@@ -962,9 +962,9 @@
 
             // Corners
             if (isFloorBelow && isFloorRight) {
-              wallKey = 'wallTLCornerTex'; // Top-Left Corner (3,2)
+              wallKey = 'wallTLCornerTex'; // Top-Left Corner (6,2)
             } else if (isFloorBelow && isFloorLeft) {
-              wallKey = 'wallTRCornerTex'; // Top-Right Corner (1,2)
+              wallKey = 'wallTRCornerTex'; // Top-Right Corner (8,2)
             } else if (isFloorAbove && isFloorRight) {
               wallKey = 'wallBLCornerTex'; // Bottom-Left Corner (1,0)
             } else if (isFloorAbove && isFloorLeft) {
@@ -972,13 +972,13 @@
             }
             // Straight Edges
             else if (isFloorBelow) {
-              wallKey = 'wallTopTex';      // Top wall (4,3)
+              wallKey = 'wallTopTex';      // Top wall (7,3)
             } else if (isFloorAbove) {
-              wallKey = 'wallBottomTex';   // Bottom wall (2,0)
+              wallKey = 'wallBottomTex';   // Bottom wall (7,2)
             } else if (isFloorLeft) {
-              wallKey = 'wallRightTex';    // Right wall (3,1)
+              wallKey = 'wallRightTex';    // Right wall (8,3)
             } else if (isFloorRight) {
-              wallKey = 'wallLeftTex';     // Left wall (1,1)
+              wallKey = 'wallLeftTex';     // Left wall (6,3)
             }
 
             let wall = dungeonWalls.create(px, py, wallKey);
