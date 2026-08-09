@@ -11,6 +11,11 @@
   <meta name="theme-color" content="#0f172a" />
   
   <title>SEW - Subterranean Extraction Warfare</title>
+  
+  <!-- Mobile Developer Console (Eruda) -->
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
+
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
   
   <style>
@@ -21,6 +26,7 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
+
     html, body {
       width: 100vw; height: 100vh; height: 100dvh;
       overflow: hidden; position: fixed; top: 0; left: 0;
@@ -59,90 +65,876 @@
     .hud-btn:active { background: rgba(56, 189, 248, 0.6); }
 
     #dialogue-box {
-      position: fixed; top: 48px; left: 15%; right: 15%;
-      z-index: 10; background: rgba(15, 23, 42, 0.9);
-      border: 2px solid #38bdf8; padding: 6px 12px; border-radius: 8px;
+      position: fixed; bottom: 95px; left: 16px; right: 16px;
+      z-index: 25; background: rgba(15, 23, 42, 0.95);
+      border: 2px solid #38bdf8; padding: 8px 16px; border-radius: 8px;
       font-size: 12px; color: #e2e8f0; pointer-events: none; text-align: center;
+      opacity: 0; transform: translateY(10px);
+      transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    }
+    #dialogue-box.visible {
+      opacity: 1; transform: translateY(0);
+    }
+
+    #plant-progress-wrap {
+      position: fixed; bottom: 145px; left: 50%; transform: translateX(-50%);
+      width: 140px; height: 12px; background: rgba(15, 23, 42, 0.85);
+      border: 2px solid #38bdf8; border-radius: 6px; display: none; z-index: 30;
+      overflow: hidden; pointer-events: none; backdrop-filter: blur(4px);
+    }
+    #plant-progress-fill {
+      width: 0%; height: 100%; background: #22c55e;
+      transition: width 0.05s linear;
     }
 
     #controls {
       position: fixed; bottom: 16px; left: 16px; right: 16px;
-      height: 110px; z-index: 20; display: flex; justify-content: space-between;
+      height: 80px; z-index: 20; display: flex; justify-content: space-between;
       align-items: center; pointer-events: none;
     }
 
     #joystick-zone {
-      width: 100px; height: 100px; background: rgba(255, 255, 255, 0.1);
+      width: 90px; height: 90px; background: rgba(255, 255, 255, 0.1);
       border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
       position: relative; pointer-events: auto; touch-action: none; backdrop-filter: blur(4px);
     }
     #joystick-knob {
-      width: 40px; height: 40px; background: rgba(56, 189, 248, 0.8);
+      width: 36px; height: 36px; background: rgba(56, 189, 248, 0.8);
       border: 2px solid #ffffff; border-radius: 50%; position: absolute;
-      top: 30px; left: 30px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      top: 25px; left: 25px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
     }
 
-    .action-btn {
-      width: 65px; height: 65px; border-radius: 50%;
-      background: rgba(34, 197, 94, 0.5); border: 3px solid rgba(34, 197, 94, 0.9);
-      color: #fff; font-size: 20px; font-weight: bold; display: flex;
-      align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(4px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    /* Right Controls Cluster: 4 Circles (Slots 1, 2, 3 + Slot 4 Action Button) */
+    #right-controls {
+      display: flex; align-items: center; gap: 8px; pointer-events: auto;
     }
-    .action-btn:active { background: rgba(34, 197, 94, 0.9); transform: scale(0.95); }
+    .circle-btn {
+      border-radius: 50%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; backdrop-filter: blur(4px);
+      user-select: none; touch-action: none; cursor: pointer; position: relative;
+    }
+    .quick-circle {
+      width: 48px; height: 48px; background: rgba(15, 23, 42, 0.85);
+      border: 2px solid rgba(255, 255, 255, 0.25); color: #cbd5e1;
+      font-size: 7px; text-align: center; padding: 2px; line-height: 1.1;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s;
+    }
+    .quick-circle.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.15); }
+    .quick-circle:active { transform: scale(0.92); }
 
+    .action-circle {
+      width: 76px; height: 76px; background: rgba(34, 197, 94, 0.6);
+      border: 3px solid rgba(34, 197, 94, 0.95); color: #fff;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5); font-size: 9px; text-align: center; padding: 4px; line-height: 1.1;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s;
+    }
+    .action-circle:active { background: rgba(34, 197, 94, 0.95); transform: scale(0.92); }
+
+    /* Floating Right Inventory Panel Styling */
     .modal-overlay {
       display: none; position: fixed; top: 0; left: 0;
       width: 100vw; height: 100vh; height: 100dvh;
-      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
-      z-index: 50; justify-content: center; align-items: center;
+      background: transparent; z-index: 50; pointer-events: none;
     }
-    .modal-card {
-      width: 88%; max-width: 520px; background: #1e293b;
-      border: 2px solid #38bdf8; border-radius: 12px; padding: 16px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 12px;
+    .floating-panel {
+      position: fixed; top: 16px; right: 16px; bottom: 16px;
+      width: 60vw; background: rgba(15, 23, 42, 0.92);
+      border: 2px solid #38bdf8; border-radius: 12px; padding: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6); display: flex; flex-direction: column; gap: 6px;
+      backdrop-filter: blur(8px); pointer-events: auto;
+      touch-action: none;
     }
     .modal-header {
       display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid #334155; padding-bottom: 8px;
+      border-bottom: 1px solid #334155; padding-bottom: 4px; flex-shrink: 0;
     }
-    .modal-header h2 { font-size: 14px; color: #38bdf8; }
+    .modal-header h2 { font-size: 9.5px; color: #38bdf8; }
     .close-btn {
       background: #ef4444; border: none; color: #fff; font-weight: bold;
-      padding: 4px 10px; border-radius: 6px; cursor: pointer;
+      padding: 2px 6px; border-radius: 4px; cursor: pointer; font-size: 10px;
+      min-width: 20px; min-height: 20px; display: flex; align-items: center; justify-content: center;
     }
 
-    .inv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; max-height: 200px; overflow-y: auto; padding-right: 4px; }
+    .inv-grid { display: grid; grid-template-columns: repeat(8, 50px); gap: 3px; justify-content: center; }
     .inv-slot {
       position: relative;
-      aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
+      width: 50px; height: 50px; min-width: 50px; min-height: 50px;
+      background: #0f172a; border: 1px dashed #475569; border-radius: 4px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 8px; text-align: center; padding: 2px; color: #cbd5e1; cursor: pointer; line-height: 1.1;
+      font-size: 5px; text-align: center; padding: 0px; color: #cbd5e1; cursor: pointer; line-height: 1;
+      touch-action: none;
     }
     .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
-    .inv-slot.equipped { border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.2); }
-    .drop-slot-btn {
-      position: absolute; top: 2px; right: 2px; background: #ef4444; color: #fff;
-      border: none; font-size: 7px; padding: 2px 4px; border-radius: 4px; cursor: pointer;
+    
+    .inv-slot.hotbar-slot {
+      border: 2px solid #38bdf8; background: rgba(56, 189, 248, 0.15);
+    }
+    .inv-slot.hotbar-slot.equipped {
+      border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.25);
     }
 
-    .loot-container {
-      display: flex; gap: 12px; justify-content: space-between;
+    .slot-btn {
+      position: absolute; top: 0px; background: #ef4444; color: #fff;
+      border: none; font-size: 4.5px; padding: 0.5px 1px; border-radius: 2px; cursor: pointer; z-index: 2;
     }
-    .loot-pane {
-      flex: 1; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #334155;
-    }
-    .loot-pane h3 { font-size: 11px; color: #38bdf8; margin-bottom: 6px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .drop-slot-btn { right: 0px; display: none; }
+    .info-slot-btn { left: 0px; background: #38bdf8; color: #0f172a; font-weight: bold; display: none; }
+    .inv-slot:hover .slot-btn { display: block; }
 
-    .shop-section { display: flex; flex-direction: column; gap: 6px; }
-    .shop-section h3 { font-size: 12px; color: #f1f5f9; border-bottom: 1px dashed #334155; padding-bottom: 4px; }
+    #drag-ghost {
+      position: fixed; pointer-events: none; z-index: 9999;
+      width: 28px; height: 28px; background: rgba(56, 189, 248, 0.85);
+      border: 2px solid #fff; border-radius: 6px; display: none;
+      flex-direction: column; align-items: center; justify-content: center;
+      font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transform: translate(-50%, -50%);
+    }
+
+    .shop-container {
+      display: flex; gap: 10px; flex: 1; overflow: hidden; height: calc(100% - 40px);
+    }
+    .shop-pane {
+      flex: 1; display: flex; flex-direction: column; background: #0f172a;
+      border: 1px solid #334155; border-radius: 8px; padding: 8px; overflow: hidden;
+    }
+    .shop-pane h3 { font-size: 11px; color: #38bdf8; margin-bottom: 6px; border-bottom: 1px solid #334155; padding-bottom: 4px; flex-shrink: 0; }
+    .shop-list {
+      flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
     .shop-row {
       display: flex; justify-content: space-between; align-items: center;
-      background: #0f172a; padding: 6px 10px; border-radius: 6px; border: 1px solid #334155; font-size: 11px;
+      background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; font-size: 11px; cursor: pointer; flex-shrink: 0;
     }
+    .shop-row:active { background: #334155; }
     .action-shop-btn { background: #22c55e; border: none; color: #fff; font-weight: bold; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
     .sell-btn { background: #eab308; color: #0f172a; }
-  </style>
+  
+/* =========================================================
+   SEW MOBILE LANDSCAPE HUD 2.0
+   Compact / Rust-inspired / touch-first
+   ========================================================= */
+:root{
+  --ui-bg: rgba(12,16,20,.90);
+  --ui-bg-2: rgba(20,25,30,.94);
+  --ui-line: rgba(203,213,225,.18);
+  --ui-line-strong: rgba(203,213,225,.30);
+  --ui-text: #e5e7eb;
+  --ui-muted: #9ca3af;
+  --ui-accent: #c6d0d8;
+  --ui-green: #8fb38b;
+  --ui-red: #c87878;
+  --ui-gold: #c7a86b;
+  --ui-shadow: 0 8px 24px rgba(0,0,0,.38);
+}
+
+/* Game-space readability */
+canvas{
+  image-rendering: pixelated;
+}
+
+/* Top HUD: thin, unobtrusive, edge-hugging */
+#hud{
+  top: max(7px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  height: 38px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.hud-box{
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: 5px;
+  background: linear-gradient(180deg,rgba(24,29,34,.92),rgba(9,12,15,.88));
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  letter-spacing: .02em;
+  display:flex;
+  align-items:center;
+}
+
+#stash-info{
+  min-width: 0;
+  max-width: min(62vw, 390px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #e7e9eb;
+}
+
+#version-display{
+  margin-left:auto;
+  opacity:.55;
+  border-color: transparent;
+  background: transparent;
+  box-shadow:none;
+  padding-left:3px;
+  padding-right:3px;
+}
+
+.hud-btn{
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 5px;
+  background: linear-gradient(180deg,rgba(45,51,57,.96),rgba(18,22,26,.96));
+  color: #f3f4f6;
+  box-shadow: var(--ui-shadow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing:.04em;
+}
+
+.hud-btn:active{
+  transform: translateY(1px);
+  background: #394047;
+}
+
+/* Dialogue = small contextual toast instead of a big banner */
+#dialogue-box{
+  left:50%;
+  right:auto;
+  bottom:94px;
+  transform:translate(-50%,10px);
+  width:min(72vw,430px);
+  padding:7px 12px;
+  border:1px solid var(--ui-line-strong);
+  border-radius:4px;
+  background:rgba(12,15,18,.94);
+  color:#d7dce0;
+  box-shadow:var(--ui-shadow);
+  font-size:10px;
+  line-height:1.25;
+}
+#dialogue-box.visible{
+  transform:translate(-50%,0);
+}
+
+/* Planting progress sits just above the control deck */
+#plant-progress-wrap{
+  bottom:92px;
+  width:150px;
+  height:8px;
+  border:1px solid var(--ui-line-strong);
+  border-radius:2px;
+  background:#0c0f12;
+}
+#plant-progress-fill{
+  background:var(--ui-green);
+}
+
+/* Bottom control deck */
+#controls{
+  bottom:max(8px, env(safe-area-inset-bottom));
+  left:max(8px, env(safe-area-inset-left));
+  right:max(8px, env(safe-area-inset-right));
+  height:78px;
+  align-items:flex-end;
+}
+
+/* Joystick: larger hit area, visually quieter */
+#joystick-zone{
+  width:76px;
+  height:76px;
+  border:1px solid rgba(255,255,255,.22);
+  background:radial-gradient(circle,rgba(255,255,255,.09),rgba(255,255,255,.035));
+  box-shadow:var(--ui-shadow), inset 0 0 0 1px rgba(0,0,0,.28);
+}
+#joystick-knob{
+  width:30px;
+  height:30px;
+  top:22px;
+  left:22px;
+  background:rgba(205,213,221,.52);
+  border:1px solid rgba(255,255,255,.68);
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+}
+
+/* Right action deck */
+#right-controls{
+  gap:6px;
+  align-items:flex-end;
+}
+
+.circle-btn{
+  -webkit-tap-highlight-color:transparent;
+}
+
+.quick-circle{
+  width:44px;
+  height:44px;
+  border:1px solid var(--ui-line-strong);
+  background:linear-gradient(180deg,rgba(38,44,49,.94),rgba(13,17,20,.96));
+  color:#d7dce0;
+  box-shadow:0 5px 14px rgba(0,0,0,.35);
+}
+.quick-circle.filled{
+  border-color:rgba(198,208,216,.46);
+  background:linear-gradient(180deg,rgba(55,61,67,.96),rgba(17,21,24,.96));
+}
+.quick-circle:active{
+  transform:scale(.94);
+}
+.action-circle{
+  width:68px;
+  height:68px;
+  border:2px solid rgba(143,179,139,.82);
+  background:radial-gradient(circle at 35% 30%,rgba(143,179,139,.34),rgba(35,48,38,.96));
+  box-shadow:0 6px 18px rgba(0,0,0,.48), inset 0 0 18px rgba(255,255,255,.035);
+  font-size:9px;
+}
+.action-circle:active{
+  transform:scale(.94);
+  background:rgba(72,94,73,.98);
+}
+
+/* Make touch targets forgiving while keeping the visual controls compact */
+#btn-action, .quick-circle, #joystick-zone, .hud-btn, .close-btn{
+  touch-action:none;
+}
+
+/* Inventory panel: dense grid, less wasted space */
+.floating-panel{
+  top:max(7px,env(safe-area-inset-top));
+  right:max(7px,env(safe-area-inset-right));
+  bottom:max(7px,env(safe-area-inset-bottom));
+  width:min(66vw,620px);
+  padding:9px;
+  gap:7px;
+  border:1px solid rgba(203,213,225,.28);
+  border-radius:5px;
+  background:linear-gradient(180deg,rgba(25,30,35,.97),rgba(10,13,16,.97));
+  box-shadow:0 14px 40px rgba(0,0,0,.58);
+}
+.modal-header{
+  min-height:28px;
+  padding-bottom:5px;
+  border-bottom:1px solid rgba(203,213,225,.14);
+}
+.modal-header h2{
+  font-size:11px !important;
+  color:#dce1e5 !important;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.close-btn{
+  min-width:28px;
+  min-height:28px;
+  padding:0;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:3px;
+  background:#343b42;
+  font-size:12px;
+}
+.close-btn:active{
+  background:#4a525a;
+  transform:scale(.95);
+}
+
+.inv-grid{
+  grid-template-columns:repeat(8,minmax(38px,1fr));
+  gap:4px;
+  width:100%;
+}
+.inv-slot{
+  width:auto;
+  height:clamp(38px,7.2vw,52px);
+  min-width:0;
+  min-height:38px;
+  border:1px solid rgba(148,163,184,.20);
+  border-radius:3px;
+  background:linear-gradient(145deg,#1b2025,#0d1114);
+  font-size:9px;
+  color:#cfd5da;
+}
+.inv-slot.filled{
+  border-color:rgba(198,208,216,.38);
+  background:linear-gradient(145deg,#293138,#11161a);
+}
+.inv-slot.hotbar-slot{
+  border:1px solid rgba(198,208,216,.52);
+  background:linear-gradient(145deg,#343b42,#151a1e);
+}
+.inv-slot.hotbar-slot.equipped{
+  border:2px solid rgba(143,179,139,.82);
+  background:linear-gradient(145deg,rgba(72,94,73,.62),#151a18);
+}
+
+/* Always show item actions on touch devices */
+@media (hover:none){
+  .inv-slot .slot-btn{
+    display:block;
+  }
+}
+.slot-btn{
+  font-size:7px;
+  padding:2px 3px;
+  border-radius:2px;
+}
+
+/* Loot / shop / item windows share one compact visual language */
+.modal-overlay{
+  background:rgba(5,7,9,.72) !important;
+  backdrop-filter:blur(5px);
+}
+.modal-card{
+  border:1px solid rgba(203,213,225,.25) !important;
+  border-radius:5px !important;
+  background:linear-gradient(180deg,#242b31,#101418) !important;
+  box-shadow:0 18px 50px rgba(0,0,0,.64);
+}
+
+#loot-modal .modal-card{
+  width:min(760px,94vw) !important;
+  max-height:92dvh !important;
+}
+#loot-modal .modal-card > div:nth-child(2){
+  gap:7px !important;
+}
+#loot-modal .modal-card > div:nth-child(2) > div{
+  background:#0d1114 !important;
+  border:1px solid rgba(203,213,225,.14) !important;
+  border-radius:4px !important;
+  padding:7px !important;
+}
+#loot-modal .inv-grid{
+  grid-template-columns:repeat(4,minmax(34px,1fr)) !important;
+}
+
+#shop-modal .modal-card{
+  width:min(820px,95vw) !important;
+  height:min(86dvh,520px) !important;
+}
+.shop-container{
+  gap:7px;
+}
+.shop-pane{
+  background:#0d1114;
+  border:1px solid rgba(203,213,225,.14);
+  border-radius:4px;
+  padding:7px;
+}
+.shop-pane h3{
+  font-size:10px;
+  color:#cfd5da;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+.shop-list{
+  gap:5px;
+}
+.shop-row{
+  min-height:42px;
+  padding:7px 8px;
+  background:linear-gradient(180deg,#22292f,#151a1e);
+  border:1px solid rgba(203,213,225,.12);
+  border-radius:3px;
+  font-size:10px;
+}
+.action-shop-btn{
+  min-height:30px;
+  padding:5px 10px;
+  border-radius:3px;
+  background:#566b57;
+  border:1px solid rgba(143,179,139,.55);
+  font-size:9px;
+}
+.sell-btn{
+  background:#6f5e39;
+  border-color:rgba(199,168,107,.55);
+  color:#f4ead5;
+}
+
+/* Better landscape proportions on short phone screens */
+@media (max-height:430px) and (orientation:landscape){
+  #hud{height:34px;}
+  .hud-box,.hud-btn{min-height:30px;padding:5px 8px;font-size:9px;}
+  #controls{height:70px;}
+  #joystick-zone{width:68px;height:68px;}
+  #joystick-knob{width:28px;height:28px;top:19px;left:19px;}
+  .quick-circle{width:40px;height:40px;}
+  .action-circle{width:60px;height:60px;}
+  #dialogue-box{bottom:82px;}
+  #plant-progress-wrap{bottom:80px;}
+  .floating-panel{width:min(70vw,600px);}
+  .inv-slot{height:40px;min-height:40px;}
+}
+
+/* Extra-wide landscape: keep the UI away from screen edges */
+@media (min-width:900px) and (orientation:landscape){
+  #controls{left:16px;right:16px;}
+  #hud{left:16px;right:16px;}
+}
+
+  
+/* =========================================================
+   LOOT + BACKPACK SPLIT LAYOUT
+   Loot/Corpse = LEFT | Backpack = RIGHT
+   ========================================================= */
+
+/* When the loot modal opens, make the two inventory surfaces
+   read as one side-by-side interaction deck. */
+#loot-modal{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:8px;
+}
+
+#loot-modal .modal-card{
+  width:min(900px,96vw) !important;
+  max-width:900px !important;
+  height:min(78dvh,430px) !important;
+  max-height:78dvh !important;
+  display:grid !important;
+  grid-template-columns:minmax(0, .88fr) minmax(0, 1.12fr) !important;
+  grid-template-rows:auto 1fr !important;
+  gap:8px !important;
+  padding:9px !important;
+  position:relative;
+}
+
+/* Header spans both sides */
+#loot-modal .modal-card > .modal-header,
+#loot-modal .modal-card > div:first-child{
+  grid-column:1 / -1;
+}
+
+/* The loot modal's two content panes become:
+   left = corpse/container
+   right = player backpack */
+#loot-modal .modal-card > div:nth-child(2){
+  grid-column:1 / -1;
+  display:grid !important;
+  grid-template-columns:minmax(0, .88fr) minmax(0, 1.12fr) !important;
+  gap:8px !important;
+  min-height:0;
+}
+
+/* Each side */
+#loot-modal .modal-card > div:nth-child(2) > div{
+  min-width:0;
+  min-height:0;
+  overflow:auto;
+  background:linear-gradient(180deg,#1a2025,#0d1114) !important;
+  border:1px solid rgba(203,213,225,.18) !important;
+  border-radius:4px !important;
+  padding:7px !important;
+}
+
+/* Strong visual separation between corpse/container and backpack */
+#loot-modal .modal-card > div:nth-child(2) > div:first-child{
+  border-color:rgba(199,168,107,.30) !important;
+}
+
+#loot-modal .modal-card > div:nth-child(2) > div:last-child{
+  border-color:rgba(198,208,216,.26) !important;
+}
+
+/* Compact section headings */
+#loot-modal .modal-card h3,
+#loot-modal .modal-card h4{
+  font-size:9px !important;
+  line-height:1.1;
+  margin-bottom:5px;
+  color:#cfd5da !important;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+
+/* Loot side has a slightly warmer header accent */
+#loot-modal .modal-card > div:nth-child(2) > div:first-child h3,
+#loot-modal .modal-card > div:nth-child(2) > div:first-child h4{
+  color:#d3b979 !important;
+}
+
+/* Backpack side stays neutral */
+#loot-modal .modal-card > div:nth-child(2) > div:last-child h3,
+#loot-modal .modal-card > div:nth-child(2) > div:last-child h4{
+  color:#d5dbe0 !important;
+}
+
+/* Keep both grids compact and aligned */
+#loot-modal .inv-grid{
+  grid-template-columns:repeat(5,minmax(34px,1fr)) !important;
+  gap:4px !important;
+  align-content:start;
+}
+
+#loot-modal .inv-slot{
+  width:auto !important;
+  min-width:34px !important;
+  height:clamp(38px,7vw,48px) !important;
+  min-height:38px !important;
+}
+
+/* Backpack side can fit more slots */
+#loot-modal .modal-card > div:nth-child(2) > div:last-child .inv-grid{
+  grid-template-columns:repeat(6,minmax(34px,1fr)) !important;
+}
+
+/* Loot close button stays out of the grids */
+#loot-modal .close-btn{
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:5;
+}
+
+/* Landscape phone: maximize usable width */
+@media (max-height:500px) and (orientation:landscape){
+  #loot-modal .modal-card{
+    width:min(96vw,920px) !important;
+    height:min(86dvh,390px) !important;
+    padding:7px !important;
+  }
+
+  #loot-modal .modal-card > div:nth-child(2){
+    gap:6px !important;
+  }
+
+  #loot-modal .modal-card > div:nth-child(2) > div{
+    padding:6px !important;
+  }
+
+  #loot-modal .inv-grid{
+    grid-template-columns:repeat(5,minmax(31px,1fr)) !important;
+    gap:3px !important;
+  }
+
+  #loot-modal .modal-card > div:nth-child(2) > div:last-child .inv-grid{
+    grid-template-columns:repeat(7,minmax(31px,1fr)) !important;
+  }
+
+  #loot-modal .inv-slot{
+    min-width:31px !important;
+    height:36px !important;
+    min-height:36px !important;
+  }
+}
+
+/* Very narrow landscape phones: keep the left/right relationship
+   instead of stacking, but give the backpack more room. */
+@media (max-width:700px) and (orientation:landscape){
+  #loot-modal .modal-card{
+    width:97vw !important;
+    height:88dvh !important;
+  }
+
+  #loot-modal .modal-card > div:nth-child(2){
+    grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr) !important;
+  }
+}
+
+  
+/* =========================================================
+   REGULAR INVENTORY: DETAILS LEFT | BACKPACK RIGHT
+   ========================================================= */
+#inventory-modal .floating-panel{
+  width:min(86vw,760px) !important;
+  left:50%;
+  right:auto;
+  transform:translateX(-50%);
+}
+
+.inventory-split{
+  flex:1;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(155px,.62fr) minmax(0,1.38fr);
+  gap:8px;
+  overflow:hidden;
+}
+
+.inventory-details-panel{
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  padding:10px;
+  border:1px solid rgba(199,168,107,.28);
+  border-radius:4px;
+  background:
+    radial-gradient(circle at 50% 20%,rgba(199,168,107,.07),transparent 48%),
+    linear-gradient(180deg,#1b2024,#0d1114);
+  color:#d8dde1;
+}
+
+.inventory-details-eyebrow{
+  font-size:7px;
+  font-weight:800;
+  letter-spacing:.12em;
+  color:#a99262;
+  margin-bottom:8px;
+}
+
+.inventory-details-icon{
+  width:68px;
+  height:68px;
+  margin:2px auto 8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(203,213,225,.20);
+  border-radius:4px;
+  background:linear-gradient(145deg,#293138,#11161a);
+  font-size:32px;
+  box-shadow:inset 0 0 20px rgba(0,0,0,.25);
+}
+
+.inventory-details-title{
+  min-height:18px;
+  text-align:center;
+  font-size:12px;
+  line-height:1.2;
+  font-weight:800;
+  color:#edf0f2;
+}
+
+.inventory-details-meta{
+  margin-top:4px;
+  text-align:center;
+  font-size:8px;
+  line-height:1.35;
+  color:#9ca3af;
+}
+
+.inventory-details-divider{
+  height:1px;
+  margin:9px 0;
+  background:rgba(203,213,225,.13);
+}
+
+.inventory-details-stats{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  font-size:8px;
+  color:#cfd5da;
+}
+
+.inventory-stat{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:4px 5px;
+  border-radius:2px;
+  background:rgba(255,255,255,.035);
+}
+
+.inventory-stat span:last-child{
+  color:#e4e7e9;
+  font-weight:800;
+}
+
+.inventory-details-description{
+  margin-top:9px;
+  font-size:8px;
+  line-height:1.45;
+  color:#8f989f;
+  font-style:italic;
+}
+
+.inventory-grid-panel{
+  min-width:0;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:2px;
+  touch-action:pan-y;
+  -webkit-overflow-scrolling:touch;
+}
+
+.inventory-grid-panel .inv-grid{
+  grid-template-columns:repeat(8,minmax(34px,1fr));
+  gap:4px;
+}
+
+.inventory-grid-panel .inv-slot{
+  height:clamp(38px,6vw,50px);
+  min-height:38px;
+}
+
+/* Tapping the slot itself inspects it; the small info button remains
+   available as a secondary desktop/touch affordance. */
+.inventory-grid-panel .inv-slot.filled{
+  cursor:pointer;
+}
+
+.inventory-grid-panel .inv-slot.filled:active{
+  transform:scale(.96);
+  border-color:rgba(199,168,107,.75);
+}
+
+@media (max-height:500px) and (orientation:landscape){
+  #inventory-modal .floating-panel{
+    width:min(94vw,820px) !important;
+  }
+
+  .inventory-split{
+    grid-template-columns:minmax(140px,.55fr) minmax(0,1.45fr);
+    gap:7px;
+  }
+
+  .inventory-details-panel{
+    padding:7px;
+  }
+
+  .inventory-details-icon{
+    width:54px;
+    height:54px;
+    font-size:26px;
+    margin-bottom:5px;
+  }
+
+  .inventory-details-divider{
+    margin:6px 0;
+  }
+
+  .inventory-details-description{
+    margin-top:6px;
+  }
+
+  .inventory-grid-panel .inv-grid{
+    grid-template-columns:repeat(8,minmax(31px,1fr));
+    gap:3px;
+  }
+
+  .inventory-grid-panel .inv-slot{
+    height:36px;
+    min-height:36px;
+  }
+}
+
+@media (max-width:650px) and (orientation:landscape){
+  #inventory-modal .floating-panel{
+    width:97vw !important;
+  }
+
+  .inventory-split{
+    grid-template-columns:minmax(125px,.48fr) minmax(0,1.52fr);
+  }
+
+  .inventory-grid-panel .inv-grid{
+    grid-template-columns:repeat(7,minmax(31px,1fr));
+  }
+}
+
+  
+#boss-hud{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(360px,48vw);z-index:18;display:none;pointer-events:none;text-align:center;filter:drop-shadow(0 5px 14px rgba(0,0,0,.55))}
+#boss-name{margin-bottom:3px;color:#d8c9aa;font-size:9px;line-height:1;font-weight:900;letter-spacing:.16em;text-transform:uppercase;text-shadow:0 1px 2px #000}
+#boss-bar-shell{height:10px;padding:1px;border:1px solid rgba(203,213,225,.42);border-radius:2px;background:rgba(5,7,9,.92);box-shadow:inset 0 0 8px rgba(0,0,0,.7)}
+#boss-bar-fill{width:100%;height:100%;border-radius:1px;background:linear-gradient(90deg,#7c2525,#b84949,#d07a67);transition:width .12s linear}
+#boss-hp-text{margin-top:2px;color:#aeb5ba;font-size:7px;font-weight:700}
+@media (max-height:430px) and (orientation:landscape){#boss-hud{width:min(300px,42vw);top:7px}#boss-name{font-size:8px}#boss-bar-shell{height:8px}}
+
+</style>
 </head>
 <body>
 
@@ -151,90 +943,388 @@
     Please rotate your phone to Landscape mode to play SEW!
   </div>
 
+  <div id="drag-ghost">📦</div>
+
   <div id="hud">
-    <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.5.4</div>
-    <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
+    <div class="hud-box" id="stash-info">HP: ❤️ 100/100 | Eq: Basic Fists (10 DMG)</div>
+  <div id="boss-hud" aria-live="polite">
+    <div id="boss-name">THE ROOTBOUND WARDEN</div>
+    <div id="boss-bar-shell"><div id="boss-bar-fill"></div></div>
+    <div id="boss-hp-text">300 / 300</div>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Sample-Accurate Wall Tiling (v1.5.4) Active!</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.7.20</div>
+    <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
+  </div>
+
+  <div id="dialogue-box">Surface Hub: Ready to enter Dungeon!</div>
+
+  <div id="plant-progress-wrap">
+    <div id="plant-progress-fill"></div>
+  </div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
-    <div class="action-btn" id="btn-action">⚔️ A</div>
+    
+    <div id="right-controls">
+      <div class="circle-btn quick-circle" id="qs-0">
+        <span style="font-size:5px; position:absolute; top:4px; left:6px; color:#94a3b8; font-weight:bold;">1</span>
+        <span style="font-size:12px;">🌱</span>
+        <span style="font-size:6px;">Slot 1</span>
+      </div>
+      <div class="circle-btn quick-circle" id="qs-1">
+        <span style="font-size:5px; position:absolute; top:4px; left:6px; color:#94a3b8; font-weight:bold;">2</span>
+        <span style="font-size:12px;">⚔️</span>
+        <span style="font-size:6px;">Slot 2</span>
+      </div>
+      <div class="circle-btn quick-circle" id="qs-2">
+        <span style="font-size:5px; position:absolute; top:4px; left:6px; color:#94a3b8; font-weight:bold;">3</span>
+        <span style="font-size:12px;">🧪</span>
+        <span style="font-size:6px;">Slot 3</span>
+      </div>
+      
+      <div class="circle-btn action-circle" id="btn-action">
+        <span style="font-size:5px; position:absolute; top:6px; left:8px; color:#ffffff; font-weight:bold; opacity:0.8;">4</span>
+        <span style="font-size:22px;" id="action-icon">⚔️</span>
+        <span style="font-size:8px; font-weight:bold;" id="action-label">Action (4)</span>
+      </div>
+    </div>
   </div>
 
-  <!-- Inventory Modal -->
+  <!-- Floating Right Inventory Panel (24x24 tiles with top-right Close button) -->
   <div id="inventory-modal" class="modal-overlay">
-    <div class="modal-card">
+    <div class="floating-panel">
       <div class="modal-header">
-        <h2>🎒 Stash & Inventory (Double-Tap Equips, Use 'Drop' to Drop)</h2>
+        <h2>🎒 Inventory</h2>
         <button class="close-btn" id="btn-close-inv">✕</button>
       </div>
-      <div class="inv-grid" id="inv-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 220px;"></div>
+
+      <div class="inventory-split">
+        <div class="inventory-details-panel" id="inventory-details-panel">
+          <div class="inventory-details-eyebrow">ITEM INSPECTION</div>
+          <div class="inventory-details-icon" id="inventory-details-icon">—</div>
+          <div class="inventory-details-title" id="inventory-details-title">Select an item</div>
+          <div class="inventory-details-meta" id="inventory-details-meta">Tap an item in your backpack to inspect it.</div>
+          <div class="inventory-details-divider"></div>
+          <div class="inventory-details-stats" id="inventory-details-stats"></div>
+          <div class="inventory-details-description" id="inventory-details-description">
+            Item information will appear here.
+          </div>
+        </div>
+
+        <div class="inventory-grid-panel">
+          <div style="font-size: 7.5px; color: #cfd5da; font-weight: bold; margin-bottom: 3px;">⭐ HOTBAR · 1–4</div>
+          <div class="inv-grid" id="hotbar-grid" style="margin-bottom: 7px;"></div>
+
+          <div style="font-size: 7.5px; color: #9ca3af; font-weight: bold; margin-bottom: 3px;">📦 BACKPACK · 5–28</div>
+          <div class="inv-grid" id="storage-grid"></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Corpse Loot Modal -->
-  <div id="loot-modal" class="modal-overlay">
-    <div class="modal-card">
+  <div id="loot-modal" class="modal-overlay" style="pointer-events: auto; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);">
+    <div class="modal-card" style="width: 95%; max-width: 520px; max-height: 94dvh; background: #1e293b; border: 2px solid #38bdf8; border-radius: 12px; padding: 8px; margin: auto; display: flex; flex-direction: column; gap: 5px;">
       <div class="modal-header">
-        <h2>💀 Corpse Loot (Double-Tap to Transfer)</h2>
+        <h2 style="font-size: 11px; color: #38bdf8;">💀 Corpse Loot (Double-Tap to Transfer)</h2>
         <button class="close-btn" id="btn-close-loot">✕</button>
       </div>
-      <div class="loot-container">
-        <div class="loot-pane">
-          <h3>Enemy Loot</h3>
-          <div class="inv-grid" id="loot-npc-grid" style="grid-template-columns: repeat(2, 1fr); max-height: 180px;"></div>
+      <div style="display: flex; gap: 10px; justify-content: space-between; flex: 1;">
+        <div style="flex: 1; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #334155;">
+          <h3 style="font-size: 11px; color: #38bdf8; margin-bottom: 6px;">Enemy Loot</h3>
+          <div class="inv-grid" id="loot-npc-grid" style="grid-template-columns: repeat(2, 1fr); width: 100%;"></div>
         </div>
-        <div class="loot-pane">
-          <h3>Your Stash (16 Slots)</h3>
-          <div class="inv-grid" id="loot-player-grid" style="grid-template-columns: repeat(2, 1fr); max-height: 180px;"></div>
+        <div style="flex: 1; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #334155;">
+          <h3 style="font-size: 11px; color: #38bdf8; margin-bottom: 6px;">Your Stash</h3>
+          <div class="inv-grid" id="loot-player-grid" style="grid-template-columns: repeat(2, 1fr); width: 100%;"></div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Merchant Shop Modal -->
-  <div id="shop-modal" class="modal-overlay">
-    <div class="modal-card">
+  <div id="shop-modal" class="modal-overlay" style="pointer-events: auto; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);">
+    <div class="modal-card" style="width: 95vw; height: 85vh; max-width: 780px; background: #1e293b; border: 2px solid #38bdf8; border-radius: 12px; padding: 8px; margin: auto; display: flex; flex-direction: column; gap: 5px;">
       <div class="modal-header">
-        <h2>🏬 Surface Merchant</h2>
+        <h2 style="font-size: 11px; color: #38bdf8;">🏬 Surface Merchant</h2>
         <button class="close-btn" id="btn-close-shop">✕</button>
       </div>
-      <div class="shop-section">
-        <h3>Buy Seeds</h3>
-        <div class="shop-row">
-          <span>🌰 Sword Seed (🪙 10 Gold)</span>
-          <button class="action-shop-btn" id="btn-buy-sword-seed">Buy</button>
+      <div class="shop-container">
+        <div class="shop-pane">
+          <h3>Buy Items</h3>
+          <div class="shop-list" id="shop-buy-list"></div>
         </div>
-        <div class="shop-row">
-          <span>🏹🌰 Bow Seed (🪙 15 Gold)</span>
-          <button class="action-shop-btn" id="btn-buy-bow-seed">Buy</button>
+        <div class="shop-pane">
+          <h3>Sell Items</h3>
+          <div class="shop-list" id="shop-sell-list"></div>
         </div>
-      </div>
-      <div class="shop-section">
-        <h3>Sell Harvested Gear</h3>
-        <div id="shop-sell-list" style="max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
       </div>
     </div>
   </div>
 
+  <!-- Item Info Inspection Modal -->
+  <div id="item-info-modal" class="modal-overlay" style="z-index: 60; pointer-events: auto; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);">
+    <div class="modal-card" style="max-width: 300px; text-align: center; background: #1e293b; border: 2px solid #38bdf8; border-radius: 12px; padding: 8px; margin: auto;">
+      <div class="modal-header">
+        <h2 id="info-title" style="font-size: 11px; color: #38bdf8;">Item Details</h2>
+        <button class="close-btn" id="btn-close-info">✕</button>
+      </div>
+      <div id="info-content" style="font-size: 12px; color: #cbd5e1; padding: 8px 0; line-height: 1.4;">
+        Item description goes here...
+      </div>
+      <button class="action-shop-btn" id="btn-close-info-ok" style="width: 100%; padding: 8px; flex-shrink: 0;">Got it</button>
+    </div>
+  </div>
+
   <script>
-    // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.5.4';
+    function resetAllInputStates() {
+      if (typeof game !== 'undefined' && game.scene && game.scene.scenes[0]) {
+        let scene = game.scene.scenes[0];
+        if (scene && scene.input) {
+          scene.input.enabled = false;
+          scene.input.activePointer.isDown = false;
+          scene.input.mousePointer.isDown = false;
+          if (scene.input.manager && scene.input.manager.pointers) {
+            scene.input.manager.pointers.forEach(p => {
+              p.isDown = false;
+              p.wasTouch = false;
+              p.reset();
+            });
+          }
+          setTimeout(() => {
+            if (scene && scene.input) {
+              scene.input.enabled = true;
+            }
+          }, 40);
+        }
+      }
+    }
+
+    let dialogueTimer = null;
+    function showDialogue(text, duration = 3500) {
+      const box = document.getElementById('dialogue-box');
+      box.innerText = text;
+      box.classList.add('visible');
+      if (dialogueTimer) clearTimeout(dialogueTimer);
+      if (duration > 0) {
+        dialogueTimer = setTimeout(() => {
+          box.classList.remove('visible');
+        }, duration);
+      }
+    }
+
+    class SoundManager {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.bgmInterval = null;
+        this.currentMode = null;
+        this.plantOsc = null;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playBeep(freq, type, duration, vol = 0.1) {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          let osc = this.ctx.createOscillator();
+          let gain = this.ctx.createGain();
+          osc.type = type || 'sine';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+      }
+      swoosh() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          let bufferSize = this.ctx.sampleRate * 0.4;
+          let buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          let data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+          let noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+          let filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(300, this.ctx.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.2);
+          filter.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.4);
+          
+          let gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.02, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.2, this.ctx.currentTime + 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+          noise.start();
+        } catch(e) {}
+      }
+      hit() { this.playBeep(120, 'sawtooth', 0.1, 0.15); }
+      shoot() { this.playBeep(600, 'square', 0.1, 0.1); }
+      coin() { 
+        this.playBeep(523.25, 'sine', 0.08, 0.1); 
+        setTimeout(() => this.playBeep(659.25, 'sine', 0.12, 0.1), 80);
+      }
+      plant() {
+        this.playBeep(280, 'sine', 0.08, 0.1);
+        setTimeout(() => this.playBeep(340, 'sine', 0.1, 0.1), 60);
+      }
+      startPlantingSound() {
+        if (!this.enabled) return;
+        this.init();
+        try {
+          if (this.plantOsc) return;
+          this.plantOsc = this.ctx.createOscillator();
+          let gain = this.ctx.createGain();
+          this.plantOsc.type = 'triangle';
+          this.plantOsc.frequency.setValueAtTime(220, this.ctx.currentTime);
+          this.plantOsc.frequency.linearRampToValueAtTime(440, this.ctx.currentTime + 3.0);
+          gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 3.0);
+          this.plantOsc.connect(gain);
+          gain.connect(this.ctx.destination);
+          this.plantOsc.start();
+        } catch(e) {}
+      }
+      stopPlantingSound() {
+        if (this.plantOsc) {
+          try {
+            this.plantOsc.stop();
+            this.plantOsc.disconnect();
+          } catch(e) {}
+          this.plantOsc = null;
+        }
+      }
+      harvest() { 
+        this.playBeep(440, 'sine', 0.08, 0.1); 
+        setTimeout(() => this.playBeep(880, 'sine', 0.15, 0.1), 80);
+      }
+      drink() {
+        this.playBeep(500, 'sine', 0.1, 0.1);
+        setTimeout(() => this.playBeep(700, 'sine', 0.15, 0.1), 100);
+      }
+      transition() { this.swoosh(); }
+      click() { this.playBeep(350, 'sine', 0.05, 0.05); }
+
+      startBGM(mode) {
+        if (this.currentMode === mode && this.bgmInterval) return;
+        this.stopBGM();
+        this.currentMode = mode;
+        this.init();
+
+        let notes = mode === 'HUB' ? [261.63, 329.63, 392.00, 523.25] : [130.81, 155.56, 196.00, 220.00];
+        let step = 0;
+
+        this.bgmInterval = setInterval(() => {
+          if (!this.enabled) return;
+          try {
+            let osc = this.ctx.createOscillator();
+            let gain = this.ctx.createGain();
+            osc.type = mode === 'HUB' ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(notes[step % notes.length], this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.025, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.6);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.6);
+            step++;
+          } catch(e) {}
+        }, mode === 'HUB' ? 500 : 700);
+      }
+
+      stopBGM() {
+        if (this.bgmInterval) {
+          clearInterval(this.bgmInterval);
+          this.bgmInterval = null;
+        }
+        this.currentMode = null;
+      }
+    }
+    const sfx = new SoundManager();
+
+    window.addEventListener('pointerdown', () => {
+      sfx.init();
+      if (!sfx.currentMode) sfx.startBGM(currentZone);
+    }, { once: true });
+
+    function triggerPokemonTransition(callback) {
+      sfx.transition();
+      
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.top = '0';
+      container.style.left = '0';
+      container.style.width = '100vw';
+      container.style.height = '100vh';
+      container.style.zIndex = '99999';
+      container.style.pointerEvents = 'none';
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+
+      const bars = [];
+      for (let i = 0; i < 6; i++) {
+        const bar = document.createElement('div');
+        bar.style.flex = '1';
+        bar.style.background = '#0f172a';
+        bar.style.transform = i % 2 === 0 ? 'translateX(-100%)' : 'translateX(100%)';
+        bar.style.transition = 'transform 0.2s ease-in-out';
+        bar.style.borderBottom = '1px solid #38bdf8';
+        container.appendChild(bar);
+        bars.push(bar);
+      }
+      document.body.appendChild(container);
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          bars.forEach(b => b.style.transform = 'translateX(0)');
+        }, 10);
+      });
+
+      setTimeout(() => {
+        callback();
+      }, 220);
+
+      setTimeout(() => {
+        bars.forEach((b, idx) => {
+          b.style.transform = idx % 2 === 0 ? 'translateX(-100%)' : 'translateX(100%)';
+        });
+      }, 300);
+
+      setTimeout(() => {
+        container.remove();
+      }, 550);
+    }
+
+    const GAME_VERSION = 'v1.7.20';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
-    // --- 1. LOCAL STORAGE & INVENTORY ---
     const DEFAULT_DATA = { 
       hp: 100, 
       maxHp: 100, 
       equippedIndex: 3,
       inventory: [
-        { name: 'Gold', count: 35 },
         { name: 'Sword Seed', count: 2 },
-        { name: 'Bow Seed', count: 1 },
-        { name: 'Hunting Bow', type: 'bow', dmg: 24, speed: 520, quality: 'Fine' }
+        { name: 'Hunting Bow', type: 'bow', dmg: 24, speed: 520, quality: 'Fine' },
+        { name: 'Health Potion', quality: 'Minor', type: 'potion', healValue: 25 },
+        { name: 'Gold', count: 35 }
       ] 
     };
 
@@ -246,6 +1336,7 @@
     function savePlayerData(data) {
       localStorage.setItem('SEW_SAVE_DATA', JSON.stringify(data));
       updateUI();
+      renderQuickSlotsUI();
     }
 
     let playerData = getPlayerData();
@@ -254,19 +1345,20 @@
     let isLootOpen = false;
     let activeCorpseLoot = null;
     let currentZone = 'HUB';
-    const MAX_INVENTORY_SLOTS = 16;
+    const MAX_INVENTORY_SLOTS = 28; // 4 Hotbar slots + 24 Backpack slots
 
     function getPlayerItemCount(itemName) {
       let total = 0;
       playerData.inventory.forEach(item => {
-        if (item.name === itemName) total += (item.count || 1);
+        if (item && item.name === itemName) total += (item.count || 1);
       });
       return total;
     }
 
     function addPlayerItem(itemObj) {
+      sfx.coin();
       if (itemObj.name === 'Gold' || itemObj.name === 'Sword Seed' || itemObj.name === 'Bow Seed') {
-        let existing = playerData.inventory.find(i => i.name === itemObj.name);
+        let existing = playerData.inventory.find(i => i && i.name === itemObj.name);
         if (existing) {
           existing.count = (existing.count || 1) + (itemObj.count || 1);
           savePlayerData(playerData);
@@ -274,10 +1366,16 @@
         }
       }
 
-      if (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
-        playerData.inventory.push(itemObj);
-        savePlayerData(playerData);
-        return true;
+      while (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
+        playerData.inventory.push(null);
+      }
+
+      for (let i = 0; i < MAX_INVENTORY_SLOTS; i++) {
+        if (!playerData.inventory[i]) {
+          playerData.inventory[i] = itemObj;
+          savePlayerData(playerData);
+          return true;
+        }
       }
       return false;
     }
@@ -286,94 +1384,387 @@
       let item = playerData.inventory[index];
       if (!item) return false;
 
+      sfx.click();
       if (item.count && item.count > count) {
         item.count -= count;
       } else {
-        playerData.inventory.splice(index, 1);
-        if (playerData.equippedIndex === index) {
-          playerData.equippedIndex = null;
-        } else if (playerData.equippedIndex > index) {
-          playerData.equippedIndex--;
-        }
+        playerData.inventory[index] = null;
       }
       savePlayerData(playerData);
       return true;
     }
 
-    function getEquippedWeapon() {
-      if (playerData.equippedIndex !== null && playerData.inventory[playerData.equippedIndex]) {
-        let item = playerData.inventory[playerData.equippedIndex];
-        if (item.type === 'sword' || item.type === 'bow') return item;
+    function getEquippedItem() {
+      if (playerData.equippedIndex === undefined || playerData.equippedIndex === null) {
+        playerData.equippedIndex = 3;
       }
-      for (let i = 0; i < playerData.inventory.length; i++) {
-        let item = playerData.inventory[i];
-        if (item.type === 'sword' || item.type === 'bow') {
-          playerData.equippedIndex = i;
-          return item;
+      while (playerData.inventory.length <= playerData.equippedIndex) {
+        playerData.inventory.push(null);
+      }
+      let item = playerData.inventory[playerData.equippedIndex];
+      
+      let allEmpty = true;
+      for (let i = 0; i < 4; i++) {
+        if (playerData.inventory[i]) {
+          allEmpty = false;
+          break;
         }
       }
-      return { name: 'Fists', type: 'sword', dmg: 10, quality: 'Basic' };
+
+      if (allEmpty || !item) {
+        return { name: 'Fists', type: 'sword', dmg: 10, quality: 'Basic' };
+      }
+      return item;
     }
 
     function updateUI() {
-      let gold = getPlayerItemCount('Gold');
-      let swords = getPlayerItemCount('Sword Seed');
-      let bows = getPlayerItemCount('Bow Seed');
-      let eqWeapon = getEquippedWeapon();
+      let eqItem = getEquippedItem();
+      let eqDesc = eqItem.name === 'Fists' ? 'Basic Fists (10 DMG)' :
+                   eqItem.type === 'seed' ? `🌱 ${eqItem.quality} Health Seed` :
+                   eqItem.type === 'potion' ? `🧪 ${eqItem.quality} Potion` :
+                   eqItem.name === 'Sword Seed' ? '🌰 Sword Seed' :
+                   eqItem.name === 'Bow Seed' ? '🏹🌰 Bow Seed' :
+                   `${eqItem.quality || ''} ${eqItem.name || eqItem.type} (${eqItem.dmg || 0} DMG)`;
       document.getElementById('stash-info').innerHTML = 
-        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | 🪙 ${gold} | 🌰 ${swords} | 🏹 ${bows} | Eq: ${eqWeapon.quality || ''} ${eqWeapon.name} (${eqWeapon.dmg} DMG)`;
+        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | Slot 4 (Action): ${eqDesc}`;
     }
 
-    // --- 2. MODALS & INVENTORY ACTIONS ---
+    function renderQuickSlotsUI() {
+      while (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
+        playerData.inventory.push(null);
+      }
+      if (playerData.equippedIndex === undefined) playerData.equippedIndex = 3;
+
+      const slotMap = [0, 1, 2];
+      slotMap.forEach((invIdx, uiIdx) => {
+        const slotEl = document.getElementById(`qs-${uiIdx}`);
+        slotEl.className = 'circle-btn quick-circle';
+        let item = playerData.inventory[invIdx];
+        let slotNum = uiIdx + 1;
+
+        if (item) {
+          slotEl.classList.add('filled');
+          let icon = '📦';
+          let label = item.name || item.type;
+          let sub = '';
+
+          if (item.name === 'Gold') { icon = '🪙'; label = 'Gold'; sub = `(${item.count})`; }
+          else if (item.name === 'Sword Seed') { icon = '🌰'; label = 'Sword'; sub = `(${item.count})`; }
+          else if (item.name === 'Bow Seed') { icon = '🏹🌰'; label = 'Bow'; sub = `(${item.count})`; }
+          else if (item.type === 'seed') { icon = '🌱'; label = `${item.quality}`; sub = 'Seed'; }
+          else if (item.type === 'potion') { icon = '🧪'; label = `${item.quality}`; sub = `+${item.healValue}`; }
+          else if (item.type === 'sword') { icon = '⚔️'; label = `${item.quality}`; sub = `${item.dmg}D`; }
+          else if (item.type === 'bow') { icon = '🏹'; label = `${item.quality}`; sub = `${item.dmg}D`; }
+
+          slotEl.innerHTML = `<span style="font-size:5px; position:absolute; top:4px; left:6px; color:#94a3b8; font-weight:bold;">${slotNum}</span><span style="font-size:12px;">${icon}</span><span style="font-size:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;">${label}</span><span style="font-size:5px; color:#94a3b8;">${sub}</span>`;
+        } else {
+          slotEl.innerHTML = `<span style="font-size:5px; position:absolute; top:4px; left:6px; color:#94a3b8; font-weight:bold;">${slotNum}</span><span style="color:#64748b; font-size:6px;">Empty</span>`;
+        }
+
+        slotEl.onclick = () => {
+          sfx.click();
+          slotEl.style.transform = 'scale(0.85) translateY(-3px)';
+          setTimeout(() => { slotEl.style.transform = 'scale(1)'; }, 150);
+
+          let temp = playerData.inventory[invIdx];
+          playerData.inventory[invIdx] = playerData.inventory[3];
+          playerData.inventory[3] = temp;
+          playerData.equippedIndex = 3;
+
+          savePlayerData(playerData);
+          showDialogue(`Swapped Slot ${slotNum} with Action (4)!`);
+        };
+      });
+
+      let eq = getEquippedItem();
+      let iconSpan = document.getElementById('action-icon');
+      let labelSpan = document.getElementById('action-label');
+      let actBtn = document.getElementById('btn-action');
+
+      if (eq.name === 'Fists') { iconSpan.innerText = '✊'; labelSpan.innerText = 'Fists'; actBtn.style.borderColor = 'rgba(34, 197, 94, 0.95)'; }
+      else if (eq.type === 'sword') { iconSpan.innerText = '⚔️'; labelSpan.innerText = eq.quality ? `${eq.quality} Sword` : 'Sword'; actBtn.style.borderColor = 'rgba(34, 197, 94, 0.95)'; }
+      else if (eq.type === 'bow') { iconSpan.innerText = '🏹'; labelSpan.innerText = `${eq.quality} Bow`; actBtn.style.borderColor = 'rgba(251, 191, 36, 0.95)'; }
+      else if (eq.type === 'seed' || eq.name?.includes('Seed')) { iconSpan.innerText = '🌱'; labelSpan.innerText = 'Plant Seed'; actBtn.style.borderColor = 'rgba(56, 189, 248, 0.95)'; }
+      else if (eq.type === 'potion') { iconSpan.innerText = '🧪'; labelSpan.innerText = `Drink (+${eq.healValue})`; actBtn.style.borderColor = 'rgba(239, 68, 68, 0.95)'; }
+      else { iconSpan.innerText = '⚔️'; labelSpan.innerText = eq.name || 'Action (4)'; actBtn.style.borderColor = 'rgba(34, 197, 94, 0.95)'; }
+    }
+
+    function showInventoryItemDetails(item) {
+      if (!item) return;
+
+      const icon = document.getElementById('inventory-details-icon');
+      const title = document.getElementById('inventory-details-title');
+      const meta = document.getElementById('inventory-details-meta');
+      const stats = document.getElementById('inventory-details-stats');
+      const desc = document.getElementById('inventory-details-description');
+
+      if (!item) {
+        document.getElementById('inventory-details-icon').innerText = '—';
+        document.getElementById('inventory-details-title').innerText = 'Select an item';
+        document.getElementById('inventory-details-meta').innerText = 'Tap an item in your backpack to inspect it.';
+        document.getElementById('inventory-details-stats').innerHTML = '';
+        document.getElementById('inventory-details-description').innerText = 'Item information will appear here.';
+        return;
+      }
+
+      let itemIcon = '📦';
+      let itemTitle = item.name || 'Unknown Item';
+      let itemMeta = '';
+      let statRows = [];
+      let description = 'An item found in the subterranean depths.';
+
+      if (item.name === 'Gold') {
+        itemIcon = '🪙';
+        itemTitle = 'Gold';
+        itemMeta = `Currency · ${item.count || 0} held`;
+        statRows = [['Amount', item.count || 0]];
+        description = 'Currency used to purchase seeds and other items from the surface merchant.';
+      } else if (item.type === 'sword') {
+        itemIcon = '⚔️';
+        itemTitle = `${item.quality || ''} ${item.name || 'Sword'}`.trim();
+        itemMeta = 'WEAPON · SWORD';
+        statRows = [['Damage', item.dmg ?? '—'], ['Attack speed', item.speed ? `${item.speed} ms` : '—']];
+        description = 'A powerful weapon forged from subterranean growth.';
+      } else if (item.type === 'bow') {
+        itemIcon = '🏹';
+        itemTitle = `${item.quality || ''} ${item.name || 'Bow'}`.trim();
+        itemMeta = 'WEAPON · BOW';
+        statRows = [['Damage', item.dmg ?? '—'], ['Attack speed', item.speed ? `${item.speed} ms` : '—']];
+        description = 'A ranged weapon grown and forged from subterranean materials.';
+      } else if (item.type === 'potion') {
+        itemIcon = '🧪';
+        itemTitle = `${item.quality || ''} Health Potion`.trim();
+        itemMeta = 'CONSUMABLE · HEALTH';
+        statRows = [['Healing', `+${item.healValue ?? 0} HP`]];
+        description = 'Consume this potion to restore health instantly.';
+      } else if (item.type === 'seed' || item.name?.includes('Seed')) {
+        itemIcon = '🌱';
+        itemTitle = item.name || `${item.quality || 'Standard'} Health Seed`;
+        itemMeta = `SEED · ${item.quality || 'STANDARD'}`;
+        statRows = [['Quality', item.quality || 'Standard']];
+        description = 'Equip this seed to Slot 4, stand near soil, and hold the Action button to plant it.';
+      }
+
+      icon.innerText = itemIcon;
+      title.innerText = itemTitle;
+      meta.innerText = itemMeta;
+
+      stats.innerHTML = statRows.map(([label, value]) =>
+        `<div class="inventory-stat"><span>${label}</span><span>${value}</span></div>`
+      ).join('');
+
+      desc.innerText = description;
+    }
+
+    function showItemInfo(item) {
+      sfx.click();
+      const title = document.getElementById('info-title');
+      const content = document.getElementById('info-content');
+      
+      if (item.type === 'sword' || item.type === 'bow') {
+        title.innerText = `${item.quality} ${item.name}`;
+        content.innerHTML = `Type: <b>${item.type.toUpperCase()}</b><br>Damage: <b>${item.dmg}</b><br>Attack Speed: <b>${item.speed}ms</b><br><br><i>A powerful weapon forged from subterranean growth.</i>`;
+      } else if (item.type === 'potion') {
+        title.innerText = `${item.quality} Health Potion`;
+        content.innerHTML = `Type: <b>CONSUMABLE</b><br>Healing: <b>+${item.healValue} HP</b><br><br><i>Tap Action button (Slot 4) when equipped to drink and restore health instantly!</i>`;
+      } else if (item.type === 'seed' || item.name?.includes('Seed')) {
+        title.innerText = item.name || `${item.quality} Health Seed`;
+        content.innerHTML = `Type: <b>SEED</b><br>Quality: <b>${item.quality || 'Standard'}</b><br><br><i>Equip this seed to Slot 4 (Action), stand near soil, and hold the Action button to plant!</i>`;
+      } else if (item.name === 'Gold') {
+        title.innerText = 'Gold Currency';
+        content.innerHTML = `Type: <b>CURRENCY</b><br>Amount: <b>${item.count}</b><br><br><i>Used to purchase seeds and items from the surface merchant.</i>`;
+      } else {
+        title.innerText = item.name || 'Unknown Item';
+        content.innerHTML = `An item found in the subterranean depths.`;
+      }
+
+      document.getElementById('item-info-modal').style.display = 'flex';
+    }
+
     const invModal = document.getElementById('inventory-modal');
     const shopModal = document.getElementById('shop-modal');
     const lootModal = document.getElementById('loot-modal');
-    const invGrid = document.getElementById('inv-grid');
+    const infoModal = document.getElementById('item-info-modal');
+    const hotbarGrid = document.getElementById('hotbar-grid');
+    const storageGrid = document.getElementById('storage-grid');
+    const shopBuyList = document.getElementById('shop-buy-list');
     const shopSellList = document.getElementById('shop-sell-list');
+    const dragGhost = document.getElementById('drag-ghost');
+
+    let draggedIndex = null;
+    let holdTimer = null;
 
     function toggleInventory(show) {
+      sfx.click();
       isInventoryOpen = show;
-      invModal.style.display = show ? 'flex' : 'none';
+      invModal.style.display = show ? 'block' : 'none';
       if (show) {
-        invGrid.innerHTML = '';
-        for (let i = 0; i < MAX_INVENTORY_SLOTS; i++) {
-          const slot = document.createElement('div');
-          slot.className = 'inv-slot';
-          let item = playerData.inventory[i];
-          if (item) {
-            slot.classList.add('filled');
-            if (i === playerData.equippedIndex) slot.classList.add('equipped');
+        renderInventoryGrid();
+        const firstItem = playerData.inventory.find(i => i);
+        if (firstItem) showInventoryItemDetails(firstItem);
+        else showInventoryItemDetails(null);
+      } else {
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+        if (draggedIndex !== null) {
+          draggedIndex = null;
+          dragGhost.style.display = 'none';
+          window.removeEventListener('pointermove', onWindowPointerMove);
+          window.removeEventListener('pointerup', onWindowPointerUp);
+          window.removeEventListener('pointercancel', onWindowPointerUp);
+        }
+        resetAllInputStates();
+      }
+    }
 
-            if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold<br>(${item.count})`;
-            else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Sword Seed<br>(${item.count})`;
-            else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>Bow Seed<br>(${item.count})`;
-            else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
-            else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.quality}<br>${item.dmg} DMG${i === playerData.equippedIndex ? '<br>(Eq)' : ''}`;
+    function onWindowPointerMove(e) {
+      if (draggedIndex === null) return;
+      dragGhost.style.left = e.clientX + 'px';
+      dragGhost.style.top = e.clientY + 'px';
+    }
 
-            const dropBtn = document.createElement('button');
-            dropBtn.className = 'drop-slot-btn';
-            dropBtn.innerText = 'Drop';
-            dropBtn.addEventListener('pointerdown', (e) => {
-              e.stopPropagation();
-              dropItemToGround(i);
-            });
-            slot.appendChild(dropBtn);
+    function onWindowPointerUp(e) {
+      if (draggedIndex === null) return;
+      dragGhost.style.display = 'none';
 
-            let lastTap = 0;
-            slot.addEventListener('pointerdown', (e) => {
-              let currentTime = new Date().getTime();
-              if (currentTime - lastTap < 350 && (item.type === 'sword' || item.type === 'bow')) {
-                e.preventDefault();
-                playerData.equippedIndex = i;
-                savePlayerData(playerData);
-                toggleInventory(true);
-              }
-              lastTap = currentTime;
-            });
-          } else {
-            slot.innerText = 'Empty';
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerUp);
+
+      let dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+      let targetSlotEl = dropTarget ? dropTarget.closest('.inv-slot') : null;
+
+      if (targetSlotEl && targetSlotEl.dataset.index !== undefined) {
+        let targetIndex = parseInt(targetSlotEl.dataset.index, 10);
+        if (draggedIndex !== targetIndex) {
+          let temp = playerData.inventory[draggedIndex];
+          playerData.inventory[draggedIndex] = playerData.inventory[targetIndex];
+          playerData.inventory[targetIndex] = temp;
+
+          while (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
+            playerData.inventory.push(null);
           }
-          invGrid.appendChild(slot);
+
+          sfx.coin();
+          savePlayerData(playerData);
+          showDialogue("Item moved/swapped!");
+        }
+      }
+
+      draggedIndex = null;
+      renderInventoryGrid();
+      resetAllInputStates();
+    }
+
+    function attachDragHandlersToSlot(slot, i) {
+      slot.addEventListener('pointerdown', (e) => {
+        if (e.target.tagName === 'BUTTON') return;
+        if (!playerData.inventory[i]) return;
+
+        let startX = e.clientX;
+        let startY = e.clientY;
+        let slotIndex = i;
+
+        if (holdTimer) clearTimeout(holdTimer);
+
+        holdTimer = setTimeout(() => {
+          draggedIndex = slotIndex;
+          let item = playerData.inventory[slotIndex];
+          let icon = item.name === 'Gold' ? '🪙' : item.type === 'sword' ? '⚔️' : item.type === 'bow' ? '🏹' : item.type === 'potion' ? '🧪' : '🌱';
+          
+          dragGhost.innerText = icon;
+          dragGhost.style.display = 'flex';
+          dragGhost.style.left = startX + 'px';
+          dragGhost.style.top = startY + 'px';
+
+          window.addEventListener('pointermove', onWindowPointerMove);
+          window.addEventListener('pointerup', onWindowPointerUp);
+          window.addEventListener('pointercancel', onWindowPointerUp);
+          showDialogue("Dragging item...", 1000);
+        }, 300);
+
+        const cancelHold = (ev) => {
+          if (Math.abs(ev.clientX - startX) > 12 || Math.abs(ev.clientY - startY) > 12) {
+            if (holdTimer) {
+              clearTimeout(holdTimer);
+              holdTimer = null;
+            }
+          }
+        };
+
+        slot.addEventListener('pointermove', cancelHold, { once: true });
+        slot.addEventListener('pointerup', () => {
+          if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+          }
+        }, { once: true });
+      });
+    }
+
+    function renderInventoryGrid() {
+      hotbarGrid.innerHTML = '';
+      storageGrid.innerHTML = '';
+      while (playerData.inventory.length < MAX_INVENTORY_SLOTS) {
+        playerData.inventory.push(null);
+      }
+
+      for (let i = 0; i < MAX_INVENTORY_SLOTS; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'inv-slot';
+        slot.dataset.index = i;
+        
+        if (i < 4) {
+          slot.classList.add('hotbar-slot');
+          if (i === 3) slot.classList.add('equipped');
+        }
+
+        let item = playerData.inventory[i];
+        if (item) {
+          slot.classList.add('filled');
+          let slotBadge = i === 3 ? '<b style="color:#22c55e">[4]</b>' : i < 3 ? `<b style="color:#38bdf8">[${i+1}]</b>` : '';
+
+          if (item.name === 'Gold') slot.innerHTML = `🪙<br>(${item.count})`;
+          else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>(${item.count})`;
+          else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>(${item.count})`;
+          else if (item.type === 'seed') slot.innerHTML = `🌱<br>${item.quality?.[0] || 'S'}`;
+          else if (item.type === 'potion') slot.innerHTML = `🧪<br>+${item.healValue}`;
+          else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.dmg}D`;
+          else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.dmg}D`;
+
+          const infoBtn = document.createElement('button');
+          infoBtn.className = 'slot-btn info-slot-btn';
+          infoBtn.innerText = 'ℹ️';
+          infoBtn.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            showItemInfo(item);
+          });
+          slot.appendChild(infoBtn);
+
+          const dropBtn = document.createElement('button');
+          dropBtn.className = 'slot-btn drop-slot-btn';
+          dropBtn.innerText = 'Drop';
+          dropBtn.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            dropItemToGround(i);
+          });
+          slot.appendChild(dropBtn);
+        } else {
+          slot.innerHTML = `<span style="font-size:4px; color:#64748b;">${i+1}</span>`;
+        }
+
+        if (item) {
+          slot.addEventListener('pointerup', (e) => {
+            if (draggedIndex !== null || e.target.tagName === 'BUTTON') return;
+            showInventoryItemDetails(item);
+          });
+        }
+
+        attachDragHandlersToSlot(slot, i);
+
+        if (i < 4) {
+          hotbarGrid.appendChild(slot);
+        } else {
+          storageGrid.appendChild(slot);
         }
       }
     }
@@ -391,26 +1782,87 @@
         worldGroundDrops.push(groundItem);
 
         removePlayerItemAtIndex(index, item.count || 1);
-        toggleInventory(true);
-        document.getElementById('dialogue-box').innerText = `Dropped ${item.quality || ''} ${item.name || item.type} onto the ground!`;
+        renderInventoryGrid();
+        showDialogue(`Dropped item onto the ground!`);
       }
     }
 
     function toggleShop(show) {
+      sfx.click();
       isShopOpen = show;
-      shopModal.style.display = show ? 'flex' : 'none';
-      if (show) refreshShopUI();
+      shopModal.style.display = show ? 'block' : 'none';
+      if (show) {
+        refreshShopUI();
+      } else {
+        resetAllInputStates();
+      }
     }
 
     function refreshShopUI() {
+      shopBuyList.innerHTML = '';
+      const buyItems = [
+        { name: 'Sword Seed', type: 'seed', price: 10, desc: 'Plant in soil to grow an Iron Sword.' },
+        { name: 'Bow Seed', type: 'seed', price: 15, desc: 'Plant in soil to grow a Hunting Bow.' },
+        { name: 'Minor Health Seed', type: 'seed', quality: 'Minor', price: 8, desc: 'Plant to grow a Minor Health Potion (+25 HP).' },
+        { name: 'Sturdy Health Seed', type: 'seed', quality: 'Sturdy', price: 14, desc: 'Plant to grow a Sturdy Health Potion (+50 HP).' }
+      ];
+
+      buyItems.forEach(bi => {
+        const row = document.createElement('div');
+        row.className = 'shop-row';
+        row.style.flexDirection = 'column';
+        row.style.alignItems = 'flex-start';
+        row.style.gap = '4px';
+
+        let topDiv = document.createElement('div');
+        topDiv.style.display = 'flex';
+        topDiv.style.justifyContent = 'space-between';
+        topDiv.style.width = '100%';
+        topDiv.style.alignItems = 'center';
+
+        let icon = bi.quality ? '🌱' : (bi.name.includes('Sword') ? '🌰' : '🏹🌰');
+        topDiv.innerHTML = `<span>${icon} ${bi.name} (🪙 ${bi.price})</span>`;
+        
+        let buyBtn = document.createElement('button');
+        buyBtn.className = 'action-shop-btn';
+        buyBtn.innerText = 'Buy';
+        buyBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (getPlayerItemCount('Gold') >= bi.price) {
+            removePlayerItemByName('Gold', bi.price);
+            if (bi.quality) {
+              addPlayerItem({ name: 'Health Seed', type: 'seed', quality: bi.quality });
+            } else {
+              addPlayerItem({ name: bi.name, count: 1 });
+            }
+            showDialogue(`Purchased 1 ${bi.name}!`);
+            refreshShopUI();
+          } else {
+            sfx.hit();
+            showDialogue("Not enough Gold!");
+          }
+        });
+        topDiv.appendChild(buyBtn);
+        row.appendChild(topDiv);
+
+        let descDiv = document.createElement('div');
+        descDiv.style.fontSize = '9px';
+        descDiv.style.color = '#94a3b8';
+        descDiv.innerText = bi.desc;
+        row.appendChild(descDiv);
+
+        row.addEventListener('click', () => showItemInfo(bi));
+        shopBuyList.appendChild(row);
+      });
+
       shopSellList.innerHTML = '';
       let sellableIndices = [];
       playerData.inventory.forEach((i, idx) => {
-        if (i.type === 'sword' || i.type === 'bow') sellableIndices.push(idx);
+        if (i && (i.type === 'sword' || i.type === 'bow' || i.type === 'potion')) sellableIndices.push(idx);
       });
       
       if (sellableIndices.length === 0) {
-        shopSellList.innerHTML = `<div class="shop-row" style="color: #94a3b8;">No weapons in inventory to sell.</div>`;
+        shopSellList.innerHTML = `<div class="shop-row" style="color: #94a3b8; justify-content:center;">No weapons or potions in inventory to sell.</div>`;
         return;
       }
 
@@ -418,22 +1870,27 @@
         let item = playerData.inventory[idx];
         const row = document.createElement('div');
         row.className = 'shop-row';
-        let icon = item.type === 'sword' ? '⚔️' : '🏹';
-        let sellPrice = item.dmg * 2;
-        row.innerHTML = `<span>${icon} ${item.quality} (${item.dmg} DMG)</span><button class="action-shop-btn sell-btn">Sell (🪙 ${sellPrice})</button>`;
-        row.querySelector('.sell-btn').addEventListener('click', () => {
+        let icon = item.type === 'sword' ? '⚔️' : item.type === 'bow' ? '🏹' : '🧪';
+        let sellPrice = item.type === 'potion' ? (item.healValue / 2) : (item.dmg * 2);
+        row.innerHTML = `<span>${icon} ${item.quality} ${item.name || item.type}</span><button class="action-shop-btn sell-btn">Sell (🪙 ${sellPrice})</button>`;
+        
+        row.querySelector('.sell-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
           removePlayerItemAtIndex(idx, 1);
           addPlayerItem({ name: 'Gold', count: sellPrice });
           refreshShopUI();
         });
+
+        row.addEventListener('click', () => showItemInfo(item));
         shopSellList.appendChild(row);
       });
     }
 
     function openLootModal(corpseObj) {
+      sfx.click();
       activeCorpseLoot = corpseObj;
       isLootOpen = true;
-      lootModal.style.display = 'flex';
+      lootModal.style.display = 'block';
       renderLootGrid();
     }
 
@@ -446,11 +1903,27 @@
       activeCorpseLoot.items.forEach((itemObj, idx) => {
         const slot = document.createElement('div');
         slot.className = 'inv-slot filled';
-        if (itemObj.name === 'Gold') slot.innerHTML = `🪙 Gold<br>(${itemObj.count})`;
-        else if (itemObj.name === 'Sword Seed') slot.innerHTML = `🌰 Sword Seed<br>(${itemObj.count})`;
-        else if (itemObj.name === 'Bow Seed') slot.innerHTML = `🏹🌰 Bow Seed<br>(${itemObj.count})`;
-        else if (itemObj.type === 'sword') slot.innerHTML = `⚔️ ${itemObj.quality}<br>${itemObj.dmg} DMG`;
-        else if (itemObj.type === 'bow') slot.innerHTML = `🏹 ${itemObj.quality}<br>${itemObj.dmg} DMG`;
+        slot.style.width = '36px';
+        slot.style.height = '36px';
+        slot.style.minWidth = '36px';
+        slot.style.minHeight = '36px';
+
+        if (itemObj.name === 'Gold') slot.innerHTML = `🪙<br>(${itemObj.count})`;
+        else if (itemObj.name === 'Sword Seed') slot.innerHTML = `🌰<br>(${itemObj.count})`;
+        else if (itemObj.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>(${itemObj.count})`;
+        else if (itemObj.type === 'seed') slot.innerHTML = `🌱`;
+        else if (itemObj.type === 'potion') slot.innerHTML = `🧪<br>+${itemObj.healValue}`;
+        else if (itemObj.type === 'sword') slot.innerHTML = `⚔️<br>${itemObj.dmg}D`;
+        else if (itemObj.type === 'bow') slot.innerHTML = `🏹<br>${itemObj.dmg}D`;
+
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'slot-btn info-slot-btn';
+        infoBtn.innerText = 'ℹ️';
+        infoBtn.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          showItemInfo(itemObj);
+        });
+        slot.appendChild(infoBtn);
 
         let lastTap = 0;
         slot.addEventListener('pointerdown', (e) => {
@@ -475,108 +1948,123 @@
       for (let i = 0; i < MAX_INVENTORY_SLOTS; i++) {
         const slot = document.createElement('div');
         slot.className = 'inv-slot';
+        slot.style.width = '36px';
+        slot.style.height = '36px';
+        slot.style.minWidth = '36px';
+        slot.style.minHeight = '36px';
+
         let item = playerData.inventory[i];
         if (item) {
           slot.classList.add('filled');
-          if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold (${item.count})`;
-          else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Sword Seed (${item.count})`;
-          else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>Bow Seed (${item.count})`;
-          else if (item.type === 'sword') slot.innerHTML = `⚔️<br>${item.quality}<br>${item.dmg} DMG`;
-          else if (item.type === 'bow') slot.innerHTML = `🏹<br>${item.quality}<br>${item.dmg} DMG`;
+          if (item.name === 'Gold') slot.innerHTML = `🪙<br>(${item.count})`;
+          else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>(${item.count})`;
+          else if (item.name === 'Bow Seed') slot.innerHTML = `🏹🌰<br>(${item.count})`;
+          else if (item.type === 'seed') slot.innerHTML = `🌱`;
+          else if (item.type === 'potion') slot.innerHTML = `🧪`;
+          else if (item.type === 'sword') slot.innerHTML = `⚔️`;
+          else if (item.type === 'bow') slot.innerHTML = `🏹`;
         } else {
-          slot.innerText = 'Empty';
+          slot.innerHTML = `<span style="font-size:4px; color:#64748b;">${i+1}</span>`;
         }
         playerGrid.appendChild(slot);
       }
     }
 
-    document.getElementById('btn-buy-sword-seed').addEventListener('click', () => {
-      if (getPlayerItemCount('Gold') >= 10) {
-        removePlayerItemByName('Gold', 10);
-        addPlayerItem({ name: 'Sword Seed', count: 1 });
-        document.getElementById('dialogue-box').innerText = "Purchased 1 Sword Seed!";
-      } else { document.getElementById('dialogue-box').innerText = "Not enough Gold!"; }
-    });
-
-    document.getElementById('btn-buy-bow-seed').addEventListener('click', () => {
-      if (getPlayerItemCount('Gold') >= 15) {
-        removePlayerItemByName('Gold', 15);
-        addPlayerItem({ name: 'Bow Seed', count: 1 });
-        document.getElementById('dialogue-box').innerText = "Purchased 1 Bow Seed!";
-      } else { document.getElementById('dialogue-box').innerText = "Not enough Gold!"; }
-    });
-
     function removePlayerItemByName(itemName, count = 1) {
-      let existing = playerData.inventory.find(i => i.name === itemName);
+      let existing = playerData.inventory.find(i => i && i.name === itemName);
       if (!existing) return false;
       if (existing.count && existing.count > count) {
         existing.count -= count;
       } else {
         let idx = playerData.inventory.indexOf(existing);
-        playerData.inventory.splice(idx, 1);
-        if (playerData.equippedIndex === idx) playerData.equippedIndex = null;
+        playerData.inventory[idx] = null;
       }
       savePlayerData(playerData);
       return true;
     }
 
+    function removePlayerSeedByQuality(quality) {
+      let existingIndex = playerData.inventory.findIndex(i => i && i.type === 'seed' && i.quality === quality);
+      if (existingIndex !== -1) {
+        removePlayerItemAtIndex(existingIndex, 1);
+        return true;
+      }
+      return false;
+    }
+
     document.getElementById('btn-bag').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(true); });
     document.getElementById('btn-close-inv').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleInventory(false); });
     document.getElementById('btn-close-shop').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleShop(false); });
-    document.getElementById('btn-close-loot').addEventListener('pointerdown', (e) => { e.preventDefault(); isLootOpen = false; lootModal.style.display = 'none'; });
+    
+    document.getElementById('btn-close-loot').addEventListener('pointerdown', (e) => { 
+      e.preventDefault(); 
+      isLootOpen = false; 
+      lootModal.style.display = 'none'; 
+      sfx.click(); 
+      resetAllInputStates(); 
+    });
 
-    // --- 3. VIRTUAL JOYSTICK ---
+    document.getElementById('btn-close-info').addEventListener('pointerdown', (e) => { 
+      e.preventDefault(); 
+      infoModal.style.display = 'none'; 
+      sfx.click(); 
+      resetAllInputStates(); 
+    });
+
+    document.getElementById('btn-close-info-ok').addEventListener('pointerdown', (e) => { 
+      e.preventDefault(); 
+      infoModal.style.display = 'none'; 
+      sfx.click(); 
+      resetAllInputStates(); 
+    });
+
     let joystickVector = { x: 0, y: 0 };
     let joystickDistance = 0;
     let joystickActive = false;
-    let joystickTouchId = null;
+    let joystickPointerId = null;
 
     const jZone = document.getElementById('joystick-zone');
     const jKnob = document.getElementById('joystick-knob');
-    const maxRadius = 35;
-    const MOVE_THRESHOLD = 12;
+    const maxRadius = 36;
+    const innerRadius = 15;
 
-    jZone.addEventListener('touchstart', (e) => {
-      if (isInventoryOpen || isShopOpen || isLootOpen) return;
+    jZone.addEventListener('pointerdown', (e) => {
+      if (isInventoryOpen || isShopOpen || isLootOpen || infoModal.style.display === 'block') return;
       e.preventDefault();
-      const touch = e.changedTouches[0];
-      joystickTouchId = touch.identifier;
+      joystickPointerId = e.pointerId;
       joystickActive = true;
-      updateJoystick(touch);
+      try { jZone.setPointerCapture(e.pointerId); } catch(err) {}
+      updateJoystick(e);
     });
 
-    jZone.addEventListener('touchmove', (e) => {
-      if (!joystickActive) return;
+    jZone.addEventListener('pointermove', (e) => {
+      if (!joystickActive || e.pointerId !== joystickPointerId) return;
       e.preventDefault();
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === joystickTouchId) {
-          updateJoystick(e.changedTouches[i]);
-          break;
-        }
-      }
+      updateJoystick(e);
     });
 
     const endJoystick = (e) => {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        if (e.changedTouches[i].identifier === joystickTouchId) {
-          joystickActive = false;
-          joystickTouchId = null;
-          joystickVector = { x: 0, y: 0 };
-          joystickDistance = 0;
-          jKnob.style.transform = `translate(0px, 0px)`;
-          break;
+      if (joystickActive && (e.pointerId === joystickPointerId || joystickPointerId === null)) {
+        joystickActive = false;
+        if (joystickPointerId !== null) {
+          try { jZone.releasePointerCapture(joystickPointerId); } catch(err) {}
         }
+        joystickPointerId = null;
+        joystickVector = { x: 0, y: 0 };
+        joystickDistance = 0;
+        jKnob.style.transform = `translate(0px, 0px)`;
       }
     };
-    jZone.addEventListener('touchend', endJoystick);
-    jZone.addEventListener('touchcancel', endJoystick);
 
-    function updateJoystick(touch) {
+    jZone.addEventListener('pointerup', endJoystick);
+    jZone.addEventListener('pointercancel', endJoystick);
+
+    function updateJoystick(e) {
       const rect = jZone.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      let dx = touch.clientX - centerX;
-      let dy = touch.clientY - centerY;
+      let dx = e.clientX - centerX;
+      let dy = e.clientY - centerY;
       let distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance > maxRadius) {
@@ -586,10 +2074,13 @@
       }
       jKnob.style.transform = `translate(${dx}px, ${dy}px)`;
       joystickDistance = distance;
+      
+      if (distance > 2) {
+        aimAngle = Math.atan2(dy, dx);
+      }
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & CANVAS TILE EXTRACTION ---
     let player, aimReticle, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
@@ -597,6 +2088,8 @@
     let dungeonCorpses = [];
     let worldGroundDrops = [];
     let minimapGfx;
+    let dungeonBoss = null;
+    let bossDefeated = false;
 
     let vinePathNodes = [];
     let vineOffshoots = [];
@@ -607,6 +2100,12 @@
     let dungeonGrid = [];
     let lastDamageTime = 0;
     let aimAngle = 0;
+
+    let plantingTimer = null;
+    let plantingProgressInterval = null;
+    let isPlantingActive = false;
+    let plantingTargetSoil = null;
+    let actionPointerId = null;
 
     const SPEED = 150;
     const TILE_SIZE = 32;
@@ -636,7 +2135,6 @@
       canvas.height = 16;
       const ctx = canvas.getContext('2d');
       const img = scene.textures.get('tiles_raw').getSourceImage();
-      // 1px margin and 1px spacing math: x = 1 + col * 17, y = 1 + row * 17 (col = across, row = down)
       const x = 1 + col * 17;
       const y = 1 + row * 17;
       ctx.drawImage(img, x, y, 16, 16, 0, 0, 16, 16);
@@ -647,29 +2145,27 @@
       const scene = this;
       scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-      // Extract exact tilemap textures (across, down) based on sample verification
-      extractTileTexture(scene, 'playerTex', 0, 7);       // Player at (0,7)
-      extractTileTexture(scene, 'enemyTex', 0, 9);        // Enemy at (0,9)
+      extractTileTexture(scene, 'playerTex', 0, 7);
+      extractTileTexture(scene, 'enemyTex', 0, 9);
       
-      // Verified Wall & Corner Tiles Mapping
-      extractTileTexture(scene, 'wallVoidTex', 0, 0);     // Void fill (0,0)
-      extractTileTexture(scene, 'wallTopTex', 7, 3);      // Top wall (7,3)
-      extractTileTexture(scene, 'wallBottomTex', 7, 2);   // Bottom wall (7,2)
-      extractTileTexture(scene, 'wallLeftTex', 6, 3);     // Left wall (6,3)
-      extractTileTexture(scene, 'wallRightTex', 8, 3);    // Right wall (8,3)
-      extractTileTexture(scene, 'wallTLCornerTex', 6, 2); // Top-Left Corner (6,2)
-      extractTileTexture(scene, 'wallTRCornerTex', 8, 2); // Top-Right Corner (8,2)
-      extractTileTexture(scene, 'wallBLCornerTex', 1, 0); // Bottom-Left Corner (1,0)
-      extractTileTexture(scene, 'wallBRCornerTex', 3, 0); // Bottom-Right Corner (3,0)
+      extractTileTexture(scene, 'wallVoidTex', 0, 0);
+      extractTileTexture(scene, 'wallTopTex', 2, 0);
+      extractTileTexture(scene, 'wallBottomTex', 2, 2);
+      extractTileTexture(scene, 'wallLeftTex', 1, 1);
+      extractTileTexture(scene, 'wallRightTex', 3, 1);
+      extractTileTexture(scene, 'wallTLCornerTex', 5, 1);
+      extractTileTexture(scene, 'wallTRCornerTex', 4, 1);
+      extractTileTexture(scene, 'wallBLCornerTex', 5, 0);
+      extractTileTexture(scene, 'wallBRCornerTex', 4, 0);
 
-      extractTileTexture(scene, 'hubFloorTex', 0, 4);     // Hub ground
-      extractTileTexture(scene, 'dungFloorTex', 1, 4);    // Dungeon floor (1,4)
-      extractTileTexture(scene, 'soilTex', 2, 5);         // Soil plot
-      extractTileTexture(scene, 'merchantTex', 1, 7);     // Merchant NPC
-      extractTileTexture(scene, 'doorTex', 6, 0);         // Dungeon Door
-      extractTileTexture(scene, 'exitTex', 7, 0);         // Exit Door
-      extractTileTexture(scene, 'corpseTex', 3, 6);       // Corpse
-      extractTileTexture(scene, 'dropTex', 4, 5);         // Ground Drop
+      extractTileTexture(scene, 'hubFloorTex', 0, 4);
+      extractTileTexture(scene, 'dungFloorTex', 1, 4);
+      extractTileTexture(scene, 'soilTex', 2, 5);
+      extractTileTexture(scene, 'merchantTex', 1, 7);
+      extractTileTexture(scene, 'doorTex', 6, 0);
+      extractTileTexture(scene, 'exitTex', 7, 0);
+      extractTileTexture(scene, 'corpseTex', 3, 6);
+      extractTileTexture(scene, 'dropTex', 4, 5);
 
       const slashGfx = scene.make.graphics({ add: false });
       slashGfx.fillStyle(0x38bdf8, 0.7);
@@ -718,19 +2214,56 @@
 
       cursors = scene.input.keyboard.createCursorKeys();
 
-      document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
+      const actionBtn = document.getElementById('btn-action');
+
+      actionBtn.addEventListener('pointerdown', (e) => {
+        if (isInventoryOpen || isShopOpen || isLootOpen || infoModal.style.display === 'block') return;
         e.preventDefault();
-        handleCombatAction(scene);
+        actionPointerId = e.pointerId;
+        try { actionBtn.setPointerCapture(e.pointerId); } catch(err) {}
+
+        let eq = getEquippedItem();
+
+        if (eq.type === 'potion') {
+          playerData.hp = Math.min(playerData.maxHp, playerData.hp + eq.healValue);
+          sfx.drink();
+          showDialogue(`Drank ${eq.quality} Health Potion! Restored ${eq.healValue} HP.`);
+          removePlayerItemAtIndex(3, 1);
+          savePlayerData(playerData);
+          return;
+        }
+
+        let targetSoil = getNearestEmptySoilPlot();
+        let isSeed = (eq.name === 'Sword Seed' || eq.name === 'Bow Seed' || eq.type === 'seed');
+
+        if (targetSoil && isSeed) {
+          startPlantingHold(scene, targetSoil, eq);
+        } else {
+          handleCombatAction(scene);
+        }
       });
 
-      let plantInterval = null;
+      const cancelActionHold = (e) => {
+        if (actionPointerId !== null && e && e.pointerId !== actionPointerId) return;
+        if (actionPointerId !== null) {
+          try { actionBtn.releasePointerCapture(actionPointerId); } catch(err) {}
+        }
+        actionPointerId = null;
+        if (isPlantingActive) {
+          cancelPlantingHold();
+        }
+      };
+
+      actionBtn.addEventListener('pointerup', cancelActionHold);
+      actionBtn.addEventListener('pointercancel', cancelActionHold);
+      actionBtn.addEventListener('pointerout', cancelActionHold);
+
       scene.input.on('pointerdown', (pointer) => {
-        if (isInventoryOpen || isShopOpen || isLootOpen) return;
+        if (isInventoryOpen || isShopOpen || isLootOpen || infoModal.style.display === 'block') return;
         if (pointer.y > window.innerHeight - 130 && pointer.x < 140) return;
-        if (pointer.y > window.innerHeight - 100 && pointer.x > window.innerWidth - 100) return;
+        if (pointer.y > window.innerHeight - 100 && pointer.x > window.innerWidth - 180) return;
 
         let worldPoint = scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
-        const dialogue = document.getElementById('dialogue-box');
 
         for (let i = worldGroundDrops.length - 1; i >= 0; i--) {
           let drop = worldGroundDrops[i];
@@ -738,14 +2271,15 @@
             if (Phaser.Math.Distance.Between(player.x, player.y, drop.x, drop.y) <= 55) {
               let success = addPlayerItem(drop.itemData);
               if (success) {
-                dialogue.innerText = `Picked up dropped item!`;
+                showDialogue(`Picked up dropped item!`);
                 drop.destroy();
                 worldGroundDrops.splice(i, 1);
               } else {
-                dialogue.innerText = "Inventory is full!";
+                sfx.hit();
+                showDialogue("Inventory is full!");
               }
             } else {
-              dialogue.innerText = "Walk closer to pick up this item!";
+              showDialogue("Walk closer to pick up this item!");
             }
             return;
           }
@@ -755,7 +2289,7 @@
           if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, mob.x, mob.y) <= 24) {
             mob.showHp = true;
             updateEnemyHpBar(mob);
-            dialogue.innerText = `Targeted Enemy! HP: ${mob.hp}/${mob.maxHp}`;
+            showDialogue(`Targeted Enemy! HP: ${mob.hp}/${mob.maxHp}`);
             return;
           }
         }
@@ -778,39 +2312,28 @@
             if (distToPlayer <= 60) {
               targetSoil.state = 'EMPTY';
               targetSoil.clearTint();
-              let harvestedWeapon = generateUniqueWeapon(targetSoil.seedType === 'Bow Seed' ? 'bow' : 'sword');
-              addPlayerItem(harvestedWeapon);
-              addPlayerItem({ name: 'Gold', count: 15 });
-              dialogue.innerText = `Harvested ${harvestedWeapon.quality} ${harvestedWeapon.name} (${harvestedWeapon.dmg} DMG) & 15 Gold!`;
+              targetSoil.setScale(2);
+              sfx.harvest();
+              
+              if (targetSoil.seedType === 'Health Seed') {
+                let harvestedPotion = generateUniquePotion(targetSoil.seedQuality);
+                addPlayerItem(harvestedPotion);
+                showDialogue(`Harvested ${harvestedPotion.quality} Health Potion (+${harvestedPotion.healValue} HP)!`);
+              } else {
+                let harvestedWeapon = generateUniqueWeapon(targetSoil.seedType === 'Bow Seed' ? 'bow' : 'sword');
+                addPlayerItem(harvestedWeapon);
+                addPlayerItem({ name: 'Gold', count: 15 });
+                showDialogue(`Harvested ${harvestedWeapon.quality} ${harvestedWeapon.name} (${harvestedWeapon.dmg} DMG) & 15 Gold!`);
+              }
             } else {
-              dialogue.innerText = "Walk closer to harvest this crop!";
+              showDialogue("Walk closer to harvest this crop!");
             }
             return;
-          }
-
-          if (targetSoil.state === 'EMPTY') {
-            if (distToPlayer <= 60) {
-              dialogue.innerText = "Holding to plant seed (3 seconds)...";
-              let startTime = Date.now();
-              plantInterval = setInterval(() => {
-                let elapsed = Date.now() - startTime;
-                if (elapsed >= 3000) {
-                  clearInterval(plantInterval);
-                  plantInterval = null;
-                  completePlanting(scene, targetSoil);
-                }
-              }, 50);
-
-              scene.input.once('pointerup', () => {
-                if (plantInterval) {
-                  clearInterval(plantInterval);
-                  plantInterval = null;
-                  dialogue.innerText = "Planting cancelled.";
-                }
-              });
-            } else {
-              dialogue.innerText = "Walk closer to the soil plot to plant!";
-            }
+          } else if (targetSoil.state === 'GROWING') {
+            showDialogue("Soil Patch Status: Growing... Crops are maturing.");
+            return;
+          } else {
+            showDialogue("Soil Patch Status: Empty. Equip a seed and hold Action button to plant.");
             return;
           }
         }
@@ -821,7 +2344,7 @@
               if (Phaser.Math.Distance.Between(player.x, player.y, corpse.x, corpse.y) <= 60) {
                 openLootModal(corpse);
               } else {
-                dialogue.innerText = "Walk closer to loot this corpse!";
+                showDialogue("Walk closer to loot this corpse!");
               }
               return;
             }
@@ -832,26 +2355,165 @@
           if (merchant && Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, merchant.x, merchant.y) <= 35) {
             if (Phaser.Math.Distance.Between(player.x, player.y, merchant.x, merchant.y) <= 75) {
               toggleShop(true);
-            } else { dialogue.innerText = "Walk closer to the Merchant!"; }
+            } else { showDialogue("Walk closer to the Merchant!"); }
             return;
           }
           if (dungeonDoor && Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, dungeonDoor.x, dungeonDoor.y) <= 35) {
             if (Phaser.Math.Distance.Between(player.x, player.y, dungeonDoor.x, dungeonDoor.y) <= 65) {
-              generateDungeon(scene);
-            } else { dialogue.innerText = "Walk closer to the Dungeon Door!"; }
+              triggerPokemonTransition(() => generateDungeon(scene));
+            } else { showDialogue("Walk closer to the Dungeon Door!"); }
             return;
           }
         } else if (currentZone === 'DUNGEON' && exitDoor) {
-          if (Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, exitDoor.x, exitDoor.y) <= 35) {
+          if (exitDoor && Phaser.Math.Distance.Between(worldPoint.x, worldPoint.y, exitDoor.x, exitDoor.y) <= 35) {
             if (Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y) <= 65) {
-              buildHubMap(scene);
-            } else { dialogue.innerText = "Walk closer to the Exit Door!"; }
+              triggerPokemonTransition(() => buildHubMap(scene));
+            } else { showDialogue("Walk closer to the Exit Door!"); }
             return;
           }
         }
       });
 
       updateUI();
+      renderQuickSlotsUI();
+    }
+
+    function getNearestEmptySoilPlot() {
+      let minDist = 60;
+      if (currentZone === 'HUB' && hubSoil && hubSoil.state === 'EMPTY') {
+        if (Phaser.Math.Distance.Between(player.x, player.y, hubSoil.x, hubSoil.y) <= minDist) return hubSoil;
+      } else if (currentZone === 'DUNGEON') {
+        for (let s of dungeonSoilList) {
+          if (s.state === 'EMPTY' && Phaser.Math.Distance.Between(player.x, player.y, s.x, s.y) <= minDist) {
+            return s;
+          }
+        }
+      }
+      return null;
+    }
+
+    function startPlantingHold(scene, targetSoil, equippedItem) {
+      isPlantingActive = true;
+      plantingTargetSoil = targetSoil;
+      sfx.startPlantingSound();
+      
+      const wrap = document.getElementById('plant-progress-wrap');
+      const fill = document.getElementById('plant-progress-fill');
+      wrap.style.display = 'block';
+      fill.style.width = '0%';
+
+      let seedName = equippedItem.type === 'seed' ? `${equippedItem.quality} Health Seed` : equippedItem.name;
+      showDialogue(`Planting ${seedName}... Hold Action button`, 3100);
+
+      let startTime = Date.now();
+      let duration = 3000;
+
+      plantingProgressInterval = setInterval(() => {
+        let elapsed = Date.now() - startTime;
+        let pct = Math.min(100, (elapsed / duration) * 100);
+        fill.style.width = pct + '%';
+      }, 30);
+
+      plantingTimer = scene.time.delayedCall(duration, () => {
+        completePlantingHold(scene, targetSoil, equippedItem);
+      });
+    }
+
+    function cancelPlantingHold() {
+      if (!isPlantingActive) return;
+      isPlantingActive = false;
+      plantingTargetSoil = null;
+      sfx.stopPlantingSound();
+
+      if (plantingTimer) {
+        plantingTimer.remove();
+        plantingTimer = null;
+      }
+      if (plantingProgressInterval) {
+        clearInterval(plantingProgressInterval);
+        plantingProgressInterval = null;
+      }
+
+      document.getElementById('plant-progress-wrap').style.display = 'none';
+      showDialogue("Planting cancelled.");
+    }
+
+    function completePlantingHold(scene, targetSoil, equippedItem) {
+      isPlantingActive = false;
+      plantingTargetSoil = null;
+      sfx.stopPlantingSound();
+      if (plantingProgressInterval) {
+        clearInterval(plantingProgressInterval);
+        plantingProgressInterval = null;
+      }
+      document.getElementById('plant-progress-wrap').style.display = 'none';
+
+      const actionBtn = document.getElementById('btn-action');
+      if (actionPointerId !== null) {
+        try {
+          if (actionBtn.hasPointerCapture(actionPointerId)) {
+            actionBtn.releasePointerCapture(actionPointerId);
+          }
+        } catch(e) {}
+        actionPointerId = null;
+      }
+
+      if (!targetSoil || !targetSoil.active) return;
+
+      let seedName = equippedItem.type === 'seed' ? equippedItem.name : equippedItem.name;
+      let success = false;
+
+      if (equippedItem.type === 'seed') {
+        success = removePlayerSeedByQuality(equippedItem.quality);
+        targetSoil.seedType = 'Health Seed';
+        targetSoil.seedQuality = equippedItem.quality;
+      } else {
+        success = removePlayerItemByName(seedName, 1);
+        targetSoil.seedType = seedName;
+        targetSoil.seedQuality = 'Standard';
+      }
+
+      if (success) {
+        targetSoil.state = 'GROWING';
+        targetSoil.setTint(0x15803d);
+        
+        scene.tweens.add({
+          targets: targetSoil,
+          scaleX: 2.2,
+          scaleY: 2.2,
+          duration: 400,
+          yoyo: true,
+          repeat: 3
+        });
+
+        sfx.plant();
+        showDialogue(`Successfully planted! Maturing in 3 seconds...`, 3000);
+        
+        if (targetSoil.growthTimer) targetSoil.growthTimer.remove();
+        targetSoil.growthTimer = scene.time.delayedCall(3000, () => {
+          if (!targetSoil || !targetSoil.active) return;
+          targetSoil.state = 'READY';
+          targetSoil.clearTint();
+          targetSoil.setTint(0x22c55e);
+          
+          scene.tweens.add({
+            targets: targetSoil,
+            scaleX: 2.4,
+            scaleY: 2.4,
+            duration: 300,
+            yoyo: true,
+            repeat: 1
+          });
+
+          sfx.coin();
+          showDialogue(`Crop is fully grown! Click patch to harvest!`);
+        });
+      } else {
+        targetSoil.state = 'EMPTY';
+        targetSoil.clearTint();
+        sfx.hit();
+        showDialogue("You don't have that seed in your inventory!");
+      }
     }
 
     function generateUniqueWeapon(type) {
@@ -869,8 +2531,20 @@
       }
     }
 
+    function generateUniquePotion() {
+      let roll = Math.random();
+      let quality, healValue;
+      if (roll < 0.5) { quality = 'Minor'; healValue = 25; }
+      else if (roll < 0.85) { quality = 'Sturdy'; healValue = 50; }
+      else if (roll < 0.98) { quality = 'Honed'; healValue = 75; }
+      else { quality = 'Masterwork'; healValue = 100; }
+
+      return { name: 'Health Potion', type: 'potion', quality: quality, healValue: healValue };
+    }
+
     function buildHubMap(scene) {
       currentZone = 'HUB';
+      sfx.startBGM('HUB');
       clearDungeon(scene);
 
       for (let x = 0; x < WORLD_SIZE; x += 32) {
@@ -882,7 +2556,9 @@
 
       hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'soilTex');
       hubSoil.setScale(2);
+      hubSoil.setImmovable(true);
       hubSoil.state = 'EMPTY';
+      scene.physics.add.collider(player, hubSoil);
 
       merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'merchantTex');
       merchant.setScale(2);
@@ -897,12 +2573,13 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Ready to enter Dungeon!";
+      showDialogue("Surface Hub: Ready to enter Dungeon!");
       updateUI();
     }
 
     function generateDungeon(scene) {
       currentZone = 'DUNGEON';
+      sfx.startBGM('DUNGEON');
       clearHub(scene);
 
       dungeonGrid = Array(MAP_GRID_SIZE).fill(null).map(() => Array(MAP_GRID_SIZE).fill(1));
@@ -958,27 +2635,25 @@
             let isFloorLeft  = (x - 1 >= 0 && dungeonGrid[y][x - 1] === 0);
             let isFloorRight = (x + 1 < MAP_GRID_SIZE && dungeonGrid[y][x + 1] === 0);
 
-            let wallKey = 'wallVoidTex'; // (0,0) default internal void
+            let wallKey = 'wallVoidTex';
 
-            // Corners
             if (isFloorBelow && isFloorRight) {
-              wallKey = 'wallTLCornerTex'; // Top-Left Corner (6,2)
+              wallKey = 'wallTLCornerTex';
             } else if (isFloorBelow && isFloorLeft) {
-              wallKey = 'wallTRCornerTex'; // Top-Right Corner (8,2)
+              wallKey = 'wallTRCornerTex';
             } else if (isFloorAbove && isFloorRight) {
-              wallKey = 'wallBLCornerTex'; // Bottom-Left Corner (1,0)
+              wallKey = 'wallBLCornerTex';
             } else if (isFloorAbove && isFloorLeft) {
-              wallKey = 'wallBRCornerTex'; // Bottom-Right Corner (3,0)
+              wallKey = 'wallBRCornerTex';
             }
-            // Straight Edges
             else if (isFloorBelow) {
-              wallKey = 'wallTopTex';      // Top wall (7,3)
+              wallKey = 'wallTopTex';
             } else if (isFloorAbove) {
-              wallKey = 'wallBottomTex';   // Bottom wall (7,2)
+              wallKey = 'wallBottomTex';
             } else if (isFloorLeft) {
-              wallKey = 'wallRightTex';    // Right wall (8,3)
+              wallKey = 'wallRightTex';
             } else if (isFloorRight) {
-              wallKey = 'wallLeftTex';     // Left wall (6,3)
+              wallKey = 'wallLeftTex';
             }
 
             let wall = dungeonWalls.create(px, py, wallKey);
@@ -1011,6 +2686,11 @@
         let rm = rooms[i];
         if (rm === startRoom) continue;
 
+
+        if (rm === targetRoom) {
+          spawnDungeonBoss(scene, rm);
+          dungeonEnemies.push(dungeonBoss);
+        } else {
         let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex');
         enemy.setScale(2);
         enemy.maxHp = 40;
@@ -1022,10 +2702,14 @@
         scene.physics.add.collider(enemy, dungeonWalls);
         dungeonEnemies.push(enemy);
 
-        if (Math.random() > 0.5) {
+        
+        }
+if (Math.random() > 0.5) {
           let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'soilTex');
           sTile.setScale(2);
+          sTile.setImmovable(true);
           sTile.state = 'EMPTY';
+          scene.physics.add.collider(player, sTile);
           dungeonSoilList.push(sTile);
         }
       }
@@ -1097,7 +2781,8 @@
               exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'exitTex');
               exitDoor.setScale(2);
               exitDoor.setDepth(1);
-              document.getElementById('dialogue-box').innerText = "The vine reached the far room and blossomed into the Exit Door!";
+              sfx.harvest();
+              showDialogue("The vine reached the far room and blossomed into the Exit Door!");
             }
             return;
           }
@@ -1131,18 +2816,84 @@
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: Explore and defeat mobs!";
+      showDialogue("Dungeon Entered: Explore and defeat mobs!");
       updateUI();
+    }
+
+
+
+    function updateDungeonBossHud() {
+      const hud = document.getElementById('boss-hud');
+      if (!hud) return;
+
+      if (!dungeonBoss || !dungeonBoss.active || dungeonBoss.hp <= 0 || currentZone !== 'DUNGEON') {
+        hud.style.display = 'none';
+        return;
+      }
+
+      hud.style.display = 'block';
+      const pct = Phaser.Math.Clamp(dungeonBoss.hp / dungeonBoss.maxHp, 0, 1);
+      document.getElementById('boss-bar-fill').style.width = `${pct * 100}%`;
+      document.getElementById('boss-hp-text').innerText =
+        `${Math.max(0, Math.ceil(dungeonBoss.hp))} / ${dungeonBoss.maxHp}`;
+    }
+
+    function spawnDungeonBoss(scene, room) {
+      const x = room.cx * TILE_SIZE;
+      const y = room.cy * TILE_SIZE;
+
+      dungeonBoss = scene.physics.add.sprite(x, y, 'enemyTex');
+      dungeonBoss.setScale(3.0);
+      dungeonBoss.setTint(0x7d3030);
+      dungeonBoss.setDepth(9);
+
+      dungeonBoss.maxHp = 300;
+      dungeonBoss.hp = 300;
+      dungeonBoss.isBoss = true;
+      dungeonBoss.attackDamage = 20;
+      dungeonBoss.moveSpeed = 45;
+      dungeonBoss.body.setSize(18, 18);
+      dungeonBoss.hpBar = scene.add.graphics().setDepth(12);
+
+      dungeonBoss.bossLabel = scene.add.text(x, y - 34, 'THE ROOTBOUND WARDEN', {
+        fontFamily: 'Arial',
+        fontSize: '8px',
+        fontStyle: 'bold',
+        color: '#e6d7b8',
+        stroke: '#080909',
+        strokeThickness: 3
+      }).setOrigin(0.5).setDepth(13);
+
+      scene.physics.add.collider(dungeonBoss, dungeonWalls);
+
+      const aura = scene.add.circle(x, y, 28, 0x7d3030, 0.12)
+        .setDepth(2)
+        .setStrokeStyle(2, 0x9f4444, 0.45);
+
+      dungeonBoss.bossAura = aura;
+
+      scene.tweens.add({
+        targets: aura,
+        scale: 1.2,
+        alpha: 0.5,
+        duration: 850,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+
+      updateEnemyHpBar(dungeonBoss);
+      showDialogue("A powerful presence lurks deeper in the dungeon.", 3500);
     }
 
     function updateEnemyHpBar(enemy) {
       enemy.hpBar.clear();
       if (!enemy.showHp || enemy.hp <= 0) return;
 
-      const barW = 28;
-      const barH = 4;
+      const barW = enemy.isBoss ? 52 : 28;
+      const barH = enemy.isBoss ? 5 : 4;
       const x = enemy.x - barW / 2;
-      const y = enemy.y - 22;
+      const y = enemy.y - (enemy.isBoss ? 43 : 22);
 
       enemy.hpBar.fillStyle(0x0f172a, 1);
       enemy.hpBar.fillRect(x, y, barW, barH);
@@ -1154,7 +2905,11 @@
     }
 
     function clearHub(scene) {
-      if (hubSoil) { hubSoil.destroy(); hubSoil = null; }
+      if (hubSoil) {
+        if (hubSoil.growthTimer) hubSoil.growthTimer.remove();
+        hubSoil.destroy();
+        hubSoil = null;
+      }
       if (merchant) { merchant.destroy(); merchant = null; }
       if (dungeonDoor) { dungeonDoor.destroy(); dungeonDoor = null; }
       dungeonFloorTiles.forEach(t => t.destroy());
@@ -1170,7 +2925,10 @@
       dungeonFloorTiles.forEach(t => t.destroy());
       dungeonFloorTiles = [];
 
-      dungeonSoilList.forEach(s => s.destroy());
+      dungeonSoilList.forEach(s => {
+        if (s.growthTimer) s.growthTimer.remove();
+        s.destroy();
+      });
       dungeonSoilList = [];
 
       dungeonEnemies.forEach(e => {
@@ -1188,59 +2946,42 @@
       minimapGfx.clear();
     }
 
-    function completePlanting(scene, targetSoil) {
-      const dialogue = document.getElementById('dialogue-box');
-      if (targetSoil.state === 'EMPTY') {
-        let swordSeeds = getPlayerItemCount('Sword Seed');
-        let bowSeeds = getPlayerItemCount('Bow Seed');
-
-        if (swordSeeds > 0 || bowSeeds > 0) {
-          let chosenSeed = swordSeeds > 0 ? 'Sword Seed' : 'Bow Seed';
-          removePlayerItemByName(chosenSeed, 1);
-          targetSoil.seedType = chosenSeed;
-          targetSoil.state = 'GROWING';
-          targetSoil.setTint(0xeab308);
-          dialogue.innerText = `Planted ${chosenSeed}! Maturing in 3 seconds...`;
-          
-          scene.time.delayedCall(3000, () => {
-            targetSoil.state = 'READY';
-            targetSoil.clearTint();
-            dialogue.innerText = `The ${chosenSeed} crop is fully grown! Click to harvest!`;
-          });
-        } else { dialogue.innerText = "You have no seeds left! Visit Merchant to buy more."; }
-      }
-    }
-
     function handleCombatAction(scene) {
-      if (isInventoryOpen || isShopOpen || isLootOpen) return;
-      const dialogue = document.getElementById('dialogue-box');
-      let eqWeapon = getEquippedWeapon();
+      if (isInventoryOpen || isShopOpen || isLootOpen || infoModal.style.display === 'block') return;
+      let eqItem = getEquippedItem();
 
-      if (eqWeapon.type === 'bow') {
+      if (eqItem.name === 'Fists') {
+        sfx.playBeep(180, 'triangle', 0.08, 0.1);
+        playAttackAnimation(scene);
+      } else if (eqItem.name === 'Sword Seed' || eqItem.name === 'Bow Seed' || eqItem.type === 'seed') {
+        showDialogue(`Cannot attack with ${eqItem.quality || ''} ${eqItem.name || 'Seed'} equipped! Stand near soil & hold Action button to plant.`);
+        sfx.hit();
+        return;
+      } else if (eqItem.type === 'bow') {
+        sfx.shoot();
         arrowProj.setPosition(player.x, player.y);
         arrowProj.setRotation(aimAngle);
         arrowProj.setVisible(true);
-        scene.physics.velocityFromRotation(aimAngle, eqWeapon.speed, arrowProj.body.velocity);
-        arrowProj.damage = eqWeapon.dmg;
-        dialogue.innerText = `Fired ${eqWeapon.quality} Bow (${eqWeapon.dmg} DMG)!`;
+        scene.physics.velocityFromRotation(aimAngle, eqItem.speed, arrowProj.body.velocity);
+        arrowProj.damage = eqItem.dmg;
       } else {
+        sfx.playBeep(220, 'triangle', 0.1, 0.12);
         playAttackAnimation(scene);
       }
 
       if (currentZone === 'DUNGEON') {
-        if (eqWeapon.type !== 'bow') {
+        if (eqItem.type !== 'bow') {
           for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
             let mob = dungeonEnemies[i];
             if (Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y) <= 65) {
-              let damage = eqWeapon.dmg;
+              let damage = eqItem.dmg;
               mob.hp -= damage;
               mob.showHp = true;
               updateEnemyHpBar(mob);
 
+              sfx.hit();
               mob.setTint(0xffffff);
               scene.time.delayedCall(150, () => mob.clearTint());
-
-              dialogue.innerText = `Swung ${eqWeapon.quality} Sword for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
 
               if (mob.hp <= 0) {
                 if (mob.hpBar) mob.hpBar.destroy();
@@ -1250,11 +2991,12 @@
                 
                 corpse.items = [
                   { name: 'Gold', count: Phaser.Math.Between(10, 20) },
-                  generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow')
+                  Math.random() > 0.4 ? generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow') : generateUniquePotion()
                 ];
                 dungeonCorpses.push(corpse);
 
-                dialogue.innerText = "Enemy slain! Click corpse when close to loot.";
+                sfx.harvest();
+                showDialogue("Enemy slain! Click corpse when close to loot.");
                 mob.destroy();
                 dungeonEnemies.splice(i, 1);
               }
@@ -1281,40 +3023,66 @@
 
     function update(time, delta) {
       player.body.setVelocity(0);
-      if (isInventoryOpen || isShopOpen || isLootOpen) return;
+      if (isInventoryOpen || isShopOpen || isLootOpen || infoModal.style.display === 'block') return;
+
+      if (isPlantingActive && plantingTargetSoil) {
+        let dist = Phaser.Math.Distance.Between(player.x, player.y, plantingTargetSoil.x, plantingTargetSoil.y);
+        if (dist > 50) {
+          cancelPlantingHold();
+        }
+      }
 
       if (joystickActive) {
-        aimAngle = Math.atan2(joystickVector.y, joystickVector.x);
+        if (joystickDistance > innerRadius) {
+          let moveFactor = (joystickDistance - innerRadius) / (maxRadius - innerRadius);
+          moveFactor = Phaser.Math.Clamp(moveFactor, 0.2, 1.0);
 
-        if (joystickVector.x < -0.1) {
-          player.setFlipX(true);
-        } else if (joystickVector.x > 0.1) {
-          player.setFlipX(false);
-        }
+          let vx = joystickVector.x * SPEED * moveFactor;
+          let vy = joystickVector.y * SPEED * moveFactor;
+          player.body.setVelocity(vx, vy);
 
-        if (joystickDistance > MOVE_THRESHOLD) {
-          player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
+          if (joystickVector.x < -0.1) {
+            player.setFlipX(true);
+          } else if (joystickVector.x > 0.1) {
+            player.setFlipX(false);
+          }
+        } else {
+          player.body.setVelocity(0);
         }
       } else {
+        let isMoving = false;
         if (cursors.left.isDown) {
           player.body.setVelocityX(-SPEED);
           aimAngle = Math.PI;
           player.setFlipX(true);
+          isMoving = true;
         } else if (cursors.right.isDown) {
           player.body.setVelocityX(SPEED);
           aimAngle = 0;
           player.setFlipX(false);
+          isMoving = true;
         }
 
         if (cursors.up.isDown) {
           player.body.setVelocityY(-SPEED);
           aimAngle = -Math.PI / 2;
+          isMoving = true;
         } else if (cursors.down.isDown) {
           player.body.setVelocityY(SPEED);
           aimAngle = Math.PI / 2;
+          isMoving = true;
         }
 
-        player.body.velocity.normalize().scale(SPEED);
+        if (isMoving && isPlantingActive && plantingTargetSoil) {
+          let dist = Phaser.Math.Distance.Between(player.x, player.y, plantingTargetSoil.x, plantingTargetSoil.y);
+          if (dist > 50) {
+            cancelPlantingHold();
+          }
+        }
+
+        if (cursors.left.isDown || cursors.right.isDown || cursors.up.isDown || cursors.down.isDown) {
+          player.body.velocity.normalize().scale(SPEED);
+        }
       }
 
       if (aimReticle) {
@@ -1334,6 +3102,7 @@
             updateEnemyHpBar(mob);
             arrowProj.setVisible(false);
             arrowProj.body.setVelocity(0);
+            sfx.hit();
 
             if (mob.hp <= 0) {
               if (mob.hpBar) mob.hpBar.destroy();
@@ -1342,7 +3111,7 @@
               corpse.setDepth(1);
               corpse.items = [
                 { name: 'Gold', count: Phaser.Math.Between(10, 20) },
-                generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow')
+                Math.random() > 0.4 ? generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow') : generateUniquePotion()
               ];
               dungeonCorpses.push(corpse);
               mob.destroy();
@@ -1357,28 +3126,34 @@
         dungeonEnemies.forEach(mob => {
           updateEnemyHpBar(mob);
           let dist = Phaser.Math.Distance.Between(mob.x, mob.y, player.x, player.y);
-          if (dist < 180 && dist > 25) {
-            game.scene.scenes[0].physics.moveToObject(mob, player, 65);
+          const engageRange = mob.isBoss ? 260 : 180;
+          const stopRange = mob.isBoss ? 48 : 25;
+          const moveSpeed = mob.isBoss ? 45 : 65;
+
+          if (dist < engageRange && dist > stopRange) {
+            game.scene.scenes[0].physics.moveToObject(mob, player, moveSpeed);
           } else {
             mob.body.setVelocity(0);
           }
 
-          if (dist <= 25 && time > lastDamageTime + 1000) {
+          if (dist <= stopRange && time > lastDamageTime + (mob.isBoss ? 800 : 1000)) {
             lastDamageTime = time;
-            playerData.hp = Math.max(0, playerData.hp - 10);
+            playerData.hp = Math.max(0, playerData.hp - (mob.isBoss ? 20 : 10));
             savePlayerData(playerData);
+            sfx.hit();
             player.setTint(0xef4444);
             game.scene.scenes[0].time.delayedCall(200, () => player.clearTint());
 
             if (playerData.hp <= 0) {
               playerData.hp = playerData.maxHp;
               savePlayerData(playerData);
-              document.getElementById('dialogue-box').innerText = "You passed out in the dungeon! Emergency extracted to Hub.";
-              buildHubMap(game.scene.scenes[0]);
+              showDialogue("You passed out in the dungeon! Emergency extracted to Hub.");
+              triggerPokemonTransition(() => buildHubMap(game.scene.scenes[0]));
             }
           }
         });
 
+        updateDungeonBossHud();
         drawMinimap();
       } else {
         minimapGfx.clear();
