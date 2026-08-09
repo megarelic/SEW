@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   
-  <!-- Web App Manifest (Forces Landscape Mode when launched from Home Screen) -->
+  <!-- Web App Manifest (Landscape Mode) -->
   <link rel="manifest" href='data:application/manifest+json,{"name":"SEW","short_name":"SEW","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"landscape"}' />
   
-  <!-- iOS Meta Tags -->
+  <!-- iOS Standalone Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="SEW" />
@@ -27,8 +27,8 @@
     }
 
     html, body {
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       height: 100dvh;
       overflow: hidden;
       position: fixed;
@@ -40,46 +40,32 @@
       touch-action: none;
     }
 
-    canvas {
-      display: block;
-      margin: 0 auto;
-    }
+    canvas { display: block; }
 
-    /* Rotate Phone Warning Screen (Only appears when held in Portrait mode) */
+    /* Rotate Phone Warning */
     #rotate-screen {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      background: #0f172a;
-      color: #38bdf8;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh; height: 100dvh;
+      background: #0f172a; color: #38bdf8;
       z-index: 100;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 24px;
-      font-size: 18px;
-      font-weight: bold;
+      justify-content: center; align-items: center;
+      text-align: center; padding: 24px;
+      font-size: 18px; font-weight: bold;
     }
     #rotate-screen span { font-size: 48px; margin-bottom: 12px; }
+    @media (orientation: portrait) { #rotate-screen { display: flex; } }
 
-    @media (orientation: portrait) {
-      #rotate-screen { display: flex; }
-    }
-
-    /* Top Status Bar (Adjusted for Landscape viewports) */
+    /* HUD Bar */
     #hud {
-      position: absolute;
-      top: 12px;
-      left: 20px;
-      right: 20px;
+      position: fixed;
+      top: 12px; left: 20px; right: 20px;
       z-index: 10;
       display: flex;
       justify-content: space-between;
+      align-items: center;
       pointer-events: none;
     }
     .hud-box {
@@ -91,13 +77,24 @@
       font-weight: bold;
       backdrop-filter: blur(4px);
     }
+    .hud-btn {
+      pointer-events: auto;
+      background: rgba(56, 189, 248, 0.2);
+      border: 2px solid #38bdf8;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+    }
+    .hud-btn:active { background: rgba(56, 189, 248, 0.6); }
 
     /* Dialogue Box */
     #dialogue-box {
-      position: absolute;
-      top: 48px;
-      left: 20%;
-      right: 20%;
+      position: fixed;
+      top: 48px; left: 20%; right: 20%;
       z-index: 10;
       background: rgba(15, 23, 42, 0.9);
       border: 2px solid #38bdf8;
@@ -109,13 +106,11 @@
       text-align: center;
     }
 
-    /* Landscape Controls Layout */
+    /* Controls Overlay */
     #controls {
-      position: absolute;
-      bottom: 16px;
-      left: 20px;
-      right: 20px;
-      height: 100px;
+      position: fixed;
+      bottom: 20px; left: 20px; right: 20px;
+      height: 120px;
       z-index: 20;
       display: flex;
       justify-content: space-between;
@@ -123,43 +118,39 @@
       pointer-events: none;
     }
 
-    /* D-PAD (Bottom Left) */
-    .dpad {
+    /* Virtual Analog Joystick */
+    #joystick-zone {
+      width: 110px;
+      height: 110px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
       position: relative;
-      width: 100px;
-      height: 100px;
       pointer-events: auto;
-    }
-    .dpad-btn {
-      position: absolute;
-      background: rgba(255, 255, 255, 0.2);
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-radius: 6px;
-      width: 32px;
-      height: 32px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-      color: #fff;
+      touch-action: none;
       backdrop-filter: blur(4px);
     }
-    .dpad-btn:active { background: rgba(56, 189, 248, 0.6); }
-    #btn-up { top: 0; left: 34px; }
-    #btn-down { bottom: 0; left: 34px; }
-    #btn-left { top: 34px; left: 0; }
-    #btn-right { top: 34px; right: 0; }
+    #joystick-knob {
+      width: 44px;
+      height: 44px;
+      background: rgba(56, 189, 248, 0.8);
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      position: absolute;
+      top: 33px; left: 33px;
+      pointer-events: none;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
 
-    /* Action Button "A" (Bottom Right) */
+    /* Action Button "A" */
     .action-btn {
-      width: 60px;
-      height: 60px;
+      width: 65px;
+      height: 65px;
       border-radius: 50%;
       background: rgba(34, 197, 94, 0.4);
       border: 3px solid rgba(34, 197, 94, 0.8);
       color: #fff;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: bold;
       display: flex;
       align-items: center;
@@ -168,35 +159,124 @@
       backdrop-filter: blur(4px);
     }
     .action-btn:active { background: rgba(34, 197, 94, 0.8); transform: scale(0.95); }
+
+    /* Inventory Modal Screen */
+    #inventory-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh; height: 100dvh;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 50;
+      justify-content: center;
+      align-items: center;
+    }
+    .inv-card {
+      width: 80%;
+      max-width: 480px;
+      background: #1e293b;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .inv-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 8px;
+    }
+    .inv-header h2 { font-size: 16px; color: #38bdf8; }
+    .inv-close-btn {
+      background: #ef4444;
+      border: none;
+      color: #fff;
+      font-weight: bold;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .inv-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+      background: #0f172a;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+    .inv-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .inv-slot {
+      aspect-ratio: 1;
+      background: #0f172a;
+      border: 1px dashed #475569;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      text-align: center;
+      padding: 4px;
+      color: #cbd5e1;
+    }
+    .inv-slot.filled {
+      border: 1px solid #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+    }
   </style>
 </head>
 <body>
 
-  <!-- Orientation Warning Overlay -->
+  <!-- Orientation Screen -->
   <div id="rotate-screen">
     <span>🔄</span>
     Please rotate your phone to Landscape mode to play SEW!
   </div>
 
+  <!-- HUD Overlay -->
   <div id="hud">
     <div class="hud-box" id="stash-info">Gold: 🪙 0 | Seeds: 🌰 3</div>
-    <div class="hud-box" id="gear-info">Gear: [None]</div>
+    <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
   <div id="dialogue-box">Walk up to the tilled soil patch and press [A] to plant!</div>
 
+  <!-- Controls -->
   <div id="controls">
-    <div class="dpad">
-      <div class="dpad-btn" id="btn-up">▲</div>
-      <div class="dpad-btn" id="btn-down">▼</div>
-      <div class="dpad-btn" id="btn-left">◀</div>
-      <div class="dpad-btn" id="btn-right">▶</div>
+    <div id="joystick-zone">
+      <div id="joystick-knob"></div>
     </div>
     <div class="action-btn" id="btn-action">A</div>
   </div>
 
+  <!-- Inventory Modal -->
+  <div id="inventory-modal">
+    <div class="inv-card">
+      <div class="inv-header">
+        <h2>🎒 Stash & Inventory</h2>
+        <button class="inv-close-btn" id="btn-close-inv">✕</button>
+      </div>
+      <div class="inv-stats">
+        <span id="inv-gold">Gold: 🪙 0</span>
+        <span id="inv-seeds">Seeds: 🌰 0</span>
+      </div>
+      <div class="inv-grid" id="inv-grid"></div>
+    </div>
+  </div>
+
   <script>
-    // --- 1. STORAGE ---
+    // --- 1. LOCAL STORAGE PERSISTENCE ---
     const DEFAULT_DATA = { gold: 25, seeds: 3, inventory: [] };
 
     function getPlayerData() {
@@ -210,16 +290,119 @@
     }
 
     let playerData = getPlayerData();
+    let isInventoryOpen = false;
 
     function updateUI() {
       document.getElementById('stash-info').innerHTML = `Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
-      document.getElementById('gear-info').innerHTML = `Gear: [${playerData.inventory.length ? playerData.inventory.join(', ') : 'Empty'}]`;
     }
 
-    // --- 2. GAME ENGINE ---
+    // --- 2. INVENTORY MODAL SYSTEM ---
+    const invModal = document.getElementById('inventory-modal');
+    const invGrid = document.getElementById('inv-grid');
+
+    function toggleInventory(show) {
+      isInventoryOpen = show;
+      invModal.style.display = show ? 'flex' : 'none';
+
+      if (show) {
+        document.getElementById('inv-gold').innerText = `Gold: 🪙 ${playerData.gold}`;
+        document.getElementById('inv-seeds').innerText = `Seeds: 🌰 ${playerData.seeds}`;
+        invGrid.innerHTML = '';
+
+        // Render 8 Inventory Slots
+        const totalSlots = 8;
+        for (let i = 0; i < totalSlots; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'inv-slot';
+          if (playerData.inventory[i]) {
+            slot.classList.add('filled');
+            slot.innerHTML = `⚔️<br>${playerData.inventory[i]}`;
+          } else {
+            slot.innerText = 'Empty';
+          }
+          invGrid.appendChild(slot);
+        }
+      }
+    }
+
+    document.getElementById('btn-bag').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      toggleInventory(true);
+    });
+    document.getElementById('btn-close-inv').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      toggleInventory(false);
+    });
+
+    // --- 3. VIRTUAL JOYSTICK LOGIC ---
+    let joystickVector = { x: 0, y: 0 };
+    let joystickActive = false;
+    let joystickTouchId = null;
+
+    const jZone = document.getElementById('joystick-zone');
+    const jKnob = document.getElementById('joystick-knob');
+    const maxRadius = 35; // Maximum displacement radius
+
+    jZone.addEventListener('touchstart', (e) => {
+      if (isInventoryOpen) return;
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      joystickTouchId = touch.identifier;
+      joystickActive = true;
+      updateJoystick(touch);
+    });
+
+    jZone.addEventListener('touchmove', (e) => {
+      if (!joystickActive) return;
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          updateJoystick(e.changedTouches[i]);
+          break;
+        }
+      }
+    });
+
+    const endJoystick = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystickTouchId) {
+          joystickActive = false;
+          joystickTouchId = null;
+          joystickVector = { x: 0, y: 0 };
+          jKnob.style.transform = `translate(0px, 0px)`;
+          break;
+        }
+      }
+    };
+
+    jZone.addEventListener('touchend', endJoystick);
+    jZone.addEventListener('touchcancel', endJoystick);
+
+    function updateJoystick(touch) {
+      const rect = jZone.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      let dx = touch.clientX - centerX;
+      let dy = touch.clientY - centerY;
+      let distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > maxRadius) {
+        dx = (dx / distance) * maxRadius;
+        dy = (dy / distance) * maxRadius;
+        distance = maxRadius;
+      }
+
+      jKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      // Normalized Vector (-1.0 to 1.0)
+      joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
+    }
+
+    // --- 4. PHASER 3 ENGINE ---
     let player, cursors, soilPatch, currentSoilState = 'EMPTY';
-    let moveDir = { up: false, down: false, left: false, right: false };
-    const SPEED = 130;
+    const SPEED = 150;
+    const WORLD_WIDTH = 1600;
+    const WORLD_HEIGHT = 1200;
 
     const config = {
       type: Phaser.AUTO,
@@ -242,41 +425,46 @@
     function create() {
       const scene = this;
 
-      // Render Tile Floor Grid
+      scene.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+      // Procedural Textures
       const tileGfx = scene.make.graphics({ add: false });
       tileGfx.fillStyle(0x1e293b, 1).fillRect(0, 0, 32, 32);
       tileGfx.lineStyle(1, 0x334155, 0.5).strokeRect(0, 0, 32, 32);
       tileGfx.generateTexture('floorTile', 32, 32);
 
-      for (let x = 0; x < window.innerWidth + 64; x += 32) {
-        for (let y = 0; y < window.innerHeight + 64; y += 32) {
-          scene.add.image(x, y, 'floorTile');
+      for (let x = 0; x < WORLD_WIDTH; x += 32) {
+        for (let y = 0; y < WORLD_HEIGHT; y += 32) {
+          scene.add.image(x + 16, y + 16, 'floorTile');
         }
       }
 
-      // Soil Patch Sprite
       const soilGfx = scene.make.graphics({ add: false });
       soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // Hero Sprite
       const playerGfx = scene.make.graphics({ add: false });
       playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24);
       playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);
       playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);
       playerGfx.generateTexture('playerTex', 32, 32);
 
-      soilPatch = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 - 20, 'soilTex');
-      player = scene.physics.add.sprite(window.innerWidth / 2 - 80, window.innerHeight / 2 - 20, 'playerTex');
+      soilPatch = scene.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, 'soilTex');
+      player = scene.physics.add.sprite(WORLD_WIDTH / 2 - 80, WORLD_HEIGHT / 2, 'playerTex');
       player.setCollideWorldBounds(true);
 
-      cursors = scene.input.keyboard.createCursorKeys();
+      // Camera Tracking
+      scene.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+      scene.cameras.main.startFollow(player, true, 0.1, 0.1);
+      scene.cameras.main.setDeadzone(window.innerWidth * 0.3, window.innerHeight * 0.3);
 
-      bindDPad('btn-up', 'up');
-      bindDPad('btn-down', 'down');
-      bindDPad('btn-left', 'left');
-      bindDPad('btn-right', 'right');
+      scene.scale.on('resize', (gameSize) => {
+        scene.cameras.main.setViewport(0, 0, gameSize.width, gameSize.height);
+        scene.cameras.main.setDeadzone(gameSize.width * 0.3, gameSize.height * 0.3);
+      });
+
+      cursors = scene.input.keyboard.createCursorKeys();
 
       document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -286,17 +474,8 @@
       updateUI();
     }
 
-    function bindDPad(btnId, direction) {
-      const el = document.getElementById(btnId);
-      const startMove = (e) => { e.preventDefault(); moveDir[direction] = true; };
-      const stopMove = (e) => { e.preventDefault(); moveDir[direction] = false; };
-
-      el.addEventListener('pointerdown', startMove);
-      el.addEventListener('pointerup', stopMove);
-      el.addEventListener('pointerleave', stopMove);
-    }
-
     function handleInteraction(scene) {
+      if (isInventoryOpen) return;
       const dist = Phaser.Math.Distance.Between(player.x, player.y, soilPatch.x, soilPatch.y);
       const dialogue = document.getElementById('dialogue-box');
 
@@ -328,7 +507,7 @@
         playerData.inventory.push('Iron Sword');
         playerData.gold += 15;
         savePlayerData(playerData);
-        dialogue.innerText = "Harvested an Iron Sword! Added 15 Gold to your stash.";
+        dialogue.innerText = "Harvested an Iron Sword! Check your Inventory [🎒].";
       } else if (currentSoilState === 'GROWING') {
         dialogue.innerText = "Patience! The plant is still growing...";
       }
@@ -337,13 +516,21 @@
     function update() {
       player.body.setVelocity(0);
 
-      if (cursors.left.isDown || moveDir.left) player.body.setVelocityX(-SPEED);
-      else if (cursors.right.isDown || moveDir.right) player.body.setVelocityX(SPEED);
+      if (isInventoryOpen) return;
 
-      if (cursors.up.isDown || moveDir.up) player.body.setVelocityY(-SPEED);
-      else if (cursors.down.isDown || moveDir.down) player.body.setVelocityY(SPEED);
+      // Handle Virtual Joystick Vector
+      if (joystickActive) {
+        player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
+      } else {
+        // Fallback Arrow Key Controls (PC)
+        if (cursors.left.isDown) player.body.setVelocityX(-SPEED);
+        else if (cursors.right.isDown) player.body.setVelocityX(SPEED);
 
-      player.body.velocity.normalize().scale(SPEED);
+        if (cursors.up.isDown) player.body.setVelocityY(-SPEED);
+        else if (cursors.down.isDown) player.body.setVelocityY(SPEED);
+
+        player.body.velocity.normalize().scale(SPEED);
+      }
     }
   </script>
 </body>
