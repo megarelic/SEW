@@ -3,13 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>SEW - Subterranean Extraction Warfare</title>
+  
+  <!-- iOS PWA Fullscreen Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SEW" />
+  
+  <title>SEW - Dungeon Harvest</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-    body { background-color: #0d0f12; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; }
-    
-    /* Mobile HUD Overlay */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    body {
+      background-color: #0f172a;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Top Status Bar */
     #hud {
       position: absolute;
       top: 12px;
@@ -22,24 +46,117 @@
     }
     .hud-box {
       background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.15);
       padding: 8px 12px;
       border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Dialogue / Prompt Box (Pokémon Style) */
+    #dialogue-box {
+      position: absolute;
+      top: 60px;
+      left: 12px;
+      right: 12px;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.9);
+      border: 2px solid #38bdf8;
+      padding: 10px 14px;
+      border-radius: 8px;
       font-size: 13px;
+      color: #e2e8f0;
+      pointer-events: none;
+      text-align: center;
+    }
+
+    /* Virtual Controls Container */
+    #controls {
+      position: absolute;
+      bottom: 24px;
+      left: 16px;
+      right: 16px;
+      height: 140px;
+      z-index: 20;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    /* D-PAD (Bottom Left) */
+    .dpad {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      pointer-events: auto;
+    }
+    .dpad-btn {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 6px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 18px;
+      color: #fff;
       backdrop-filter: blur(4px);
     }
+    .dpad-btn:active { background: rgba(56, 189, 248, 0.6); }
+    #btn-up { top: 0; left: 40px; }
+    #btn-down { bottom: 0; left: 40px; }
+    #btn-left { top: 40px; left: 0; }
+    #btn-right { top: 40px; right: 0; }
+
+    /* Action Button "A" (Bottom Right) */
+    .action-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.4);
+      border: 3px solid rgba(34, 197, 94, 0.8);
+      color: #fff;
+      font-size: 22px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+    }
+    .action-btn:active { background: rgba(34, 197, 94, 0.8); scale: 0.95; }
   </style>
 </head>
 <body>
 
   <div id="hud">
     <div class="hud-box" id="stash-info">Gold: 🪙 0 | Seeds: 🌰 3</div>
-    <div class="hud-box" id="status-info">Status: Dungeon Floor</div>
+    <div class="hud-box" id="gear-info">Gear: [None]</div>
+  </div>
+
+  <div id="dialogue-box">Walk up to the tilled soil patch and press [A] to plant!</div>
+
+  <!-- Virtual Controls for Mobile -->
+  <div id="controls">
+    <div class="dpad">
+      <div class="dpad-btn" id="btn-up">▲</div>
+      <div class="dpad-btn" id="btn-down">▼</div>
+      <div class="dpad-btn" id="btn-left">◀</div>
+      <div class="dpad-btn" id="btn-right">▶</div>
+    </div>
+    <div class="action-btn" id="btn-action">A</div>
   </div>
 
   <script>
-    // --- 1. LOCAL PLAYER DATA & STORAGE ---
-    const DEFAULT_DATA = { gold: 25, swordSeeds: 3, inventory: [] };
+    // --- 1. LOCAL STORAGE PERSISTENCE ---
+    const DEFAULT_DATA = { gold: 25, seeds: 3, inventory: [] };
 
     function getPlayerData() {
       const saved = localStorage.getItem('SEW_SAVE_DATA');
@@ -48,23 +165,26 @@
 
     function savePlayerData(data) {
       localStorage.setItem('SEW_SAVE_DATA', JSON.stringify(data));
-      updateHUD();
+      updateUI();
     }
 
     let playerData = getPlayerData();
 
-    function updateHUD() {
-      document.getElementById('stash-info').innerHTML = 
-        `Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.swordSeeds} | Gear: [${playerData.inventory.join(', ')}]`;
+    function updateUI() {
+      document.getElementById('stash-info').innerHTML = `Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
+      document.getElementById('gear-info').innerHTML = `Gear: [${playerData.inventory.length ? playerData.inventory.join(', ') : 'Empty'}]`;
     }
 
-    // --- 2. PHASER 3 GAME ENGINE ---
-    let player, targetPoint = null, soilPatch;
+    // --- 2. GAME ENGINE SETUP ---
+    let player, cursors, soilPatch, currentSoilState = 'EMPTY';
+    let moveDir = { up: false, down: false, left: false, right: false };
+    const SPEED = 120;
 
     const config = {
       type: Phaser.AUTO,
       width: window.innerWidth,
       height: window.innerHeight,
+      pixelArt: true, // Pokémon Retro Pixel Rendering
       scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -81,80 +201,124 @@
     function create() {
       const scene = this;
 
-      // Create textures programmatically (No image files required yet)
+      // --- PROCEDURAL RETRO TEXTURES ---
+      // 1. Grid Background Tile (Grass / Floor)
+      const tileGfx = scene.make.graphics({ add: false });
+      tileGfx.fillStyle(0x1e293b, 1).fillRect(0, 0, 32, 32);
+      tileGfx.lineStyle(1, 0x334155, 0.5).strokeRect(0, 0, 32, 32);
+      tileGfx.generateTexture('floorTile', 32, 32);
+
+      // Create Tile Grid Floor
+      for (let x = 0; x < window.innerWidth; x += 32) {
+        for (let y = 0; y < window.innerHeight; y += 32) {
+          scene.add.image(x + 16, y + 16, 'floorTile');
+        }
+      }
+
+      // 2. Soil Patch Sprite
+      const soilGfx = scene.make.graphics({ add: false });
+      soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
+      soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
+      soilGfx.generateTexture('soilTex', 48, 48);
+
+      // 3. Player Character Sprite (Retro Blue Red Cap Hero)
       const playerGfx = scene.make.graphics({ add: false });
-      playerGfx.fillStyle(0x3b82f6, 1).fillCircle(16, 16, 16);
+      playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24); // Blue Body
+      playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);  // Red Cap
+      playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);  // Face
       playerGfx.generateTexture('playerTex', 32, 32);
 
-      const soilGfx = scene.make.graphics({ add: false });
-      soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 80, 80);
-      soilGfx.generateTexture('soilTex', 80, 80);
-
-      // Render Soil Patch in center of screen
-      soilPatch = scene.add.sprite(window.innerWidth / 2, window.innerHeight / 2, 'soilTex').setInteractive();
-      soilPatch.isPlanted = false;
-
-      // Spawn Player
-      player = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 + 150, 'playerTex');
+      // Spawn World Objects
+      soilPatch = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 - 40, 'soilTex');
+      player = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 + 80, 'playerTex');
       player.setCollideWorldBounds(true);
 
-      // Touch-to-move controller for mobile
-      scene.input.on('pointerdown', (pointer) => {
-        // Ignore taps inside HUD or direct taps on soil
-        if (pointer.y > 60) {
-          targetPoint = { x: pointer.x, y: pointer.y };
-        }
+      // Keyboard Controls (Desktop testing)
+      cursors = scene.input.keyboard.createCursorKeys();
+
+      // Bind Mobile Virtual D-Pad Touch Events
+      bindDPad('btn-up', 'up');
+      bindDPad('btn-down', 'down');
+      bindDPad('btn-left', 'left');
+      bindDPad('btn-right', 'right');
+
+      // Bind Action "A" Button
+      document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handleInteraction(scene);
       });
 
-      // Planting & Harvesting Interaction
-      soilPatch.on('pointerdown', () => {
-        const dist = Phaser.Math.Distance.Between(player.x, player.y, soilPatch.x, soilPatch.y);
+      updateUI();
+    }
 
-        // Player must be standing close to plant/harvest
-        if (dist < 100) {
-          if (!soilPatch.isPlanted && playerData.swordSeeds > 0) {
-            // Plant Seed
-            soilPatch.isPlanted = true;
-            playerData.swordSeeds -= 1;
-            savePlayerData(playerData);
+    function bindDPad(btnId, direction) {
+      const el = document.getElementById(btnId);
+      const startMove = (e) => { e.preventDefault(); moveDir[direction] = true; };
+      const stopMove = (e) => { e.preventDefault(); moveDir[direction] = false; };
 
-            soilPatch.setTint(0xeab308); // Yellow (Growing)
-            document.getElementById('status-info').innerText = 'Status: Seed Growing (3s)...';
+      el.addEventListener('pointerdown', startMove);
+      el.addEventListener('pointerup', stopMove);
+      el.addEventListener('pointerleave', stopMove);
+    }
 
-            // Growth Timer
-            scene.time.delayedCall(3000, () => {
-              soilPatch.setTint(0x22c55e); // Green (Ready)
-              document.getElementById('status-info').innerText = 'Status: Crop Ready to Harvest!';
-            });
+    function handleInteraction(scene) {
+      const dist = Phaser.Math.Distance.Between(player.x, player.y, soilPatch.x, soilPatch.y);
+      const dialogue = document.getElementById('dialogue-box');
 
-          } else if (soilPatch.isPlanted && soilPatch.tintTopLeft === 0x22c55e) {
-            // Harvest Crop
-            soilPatch.isPlanted = false;
-            soilPatch.clearTint();
-            playerData.inventory.push('Iron Sword');
-            playerData.gold += 15;
-            savePlayerData(playerData);
-            document.getElementById('status-info').innerText = 'Status: Harvested Iron Sword!';
-          }
+      // Must be standing close to soil patch (Pokémon interaction style)
+      if (dist > 65) {
+        dialogue.innerText = "You're too far away from the soil patch!";
+        return;
+      }
+
+      if (currentSoilState === 'EMPTY') {
+        if (playerData.seeds > 0) {
+          playerData.seeds -= 1;
+          savePlayerData(playerData);
+
+          currentSoilState = 'GROWING';
+          soilPatch.setTint(0xeab308); // Yellow
+          dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
+
+          scene.time.delayedCall(3000, () => {
+            currentSoilState = 'READY';
+            soilPatch.setTint(0x22c55e); // Green
+            dialogue.innerText = "The Sword Crop has fully grown! Press [A] to harvest!";
+          });
         } else {
-          document.getElementById('status-info').innerText = 'Status: Move closer to soil patch!';
+          dialogue.innerText = "You have no seeds left to plant!";
         }
-      });
-
-      updateHUD();
+      } else if (currentSoilState === 'READY') {
+        currentSoilState = 'EMPTY';
+        soilPatch.clearTint();
+        playerData.inventory.push('Iron Sword');
+        playerData.gold += 15;
+        savePlayerData(playerData);
+        dialogue.innerText = "Harvested an Iron Sword! Added 15 Gold to your stash.";
+      } else if (currentSoilState === 'GROWING') {
+        dialogue.innerText = "Patience! The plant is still growing...";
+      }
     }
 
     function update() {
-      // Smooth movement towards touch point
-      if (targetPoint) {
-        const dist = Phaser.Math.Distance.Between(player.x, player.y, targetPoint.x, targetPoint.y);
-        if (dist > 8) {
-          this.physics.moveTo(player, targetPoint.x, targetPoint.y, 160);
-        } else {
-          player.body.setVelocity(0, 0);
-          targetPoint = null;
-        }
+      // Clear movement velocity
+      player.body.setVelocity(0);
+
+      // Handle D-Pad + Arrow Key Movement
+      if (cursors.left.isDown || moveDir.left) {
+        player.body.setVelocityX(-SPEED);
+      } else if (cursors.right.isDown || moveDir.right) {
+        player.body.setVelocityX(SPEED);
       }
+
+      if (cursors.up.isDown || moveDir.up) {
+        player.body.setVelocityY(-SPEED);
+      } else if (cursors.down.isDown || moveDir.down) {
+        player.body.setVelocityY(SPEED);
+      }
+
+      // Normalize diagonal movement speed
+      player.body.velocity.normalize().scale(SPEED);
     }
   </script>
 </body>
