@@ -4,12 +4,17 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   
-  <!-- iOS PWA Fullscreen Meta Tags -->
+  <!-- Modern iOS & PWA Standalone Manifest -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"SEW","short_name":"SEW","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","orientation":"any"}' />
+  
+  <!-- Legacy iOS Safari Standalone Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="SEW" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f172a" />
   
-  <title>SEW - Dungeon Harvest</title>
+  <title>SEW - Subterranean Extraction Warfare</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
   
   <style>
@@ -21,13 +26,23 @@
       -webkit-user-select: none;
       -webkit-touch-callout: none;
     }
-    body {
+
+    /* Lock body down on iOS to prevent address bar shifting */
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: -webkit-fill-available;
+      height: 100dvh;
+      overflow: hidden;
+      position: fixed;
+      top: 0;
+      left: 0;
       background-color: #0f172a;
       color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      overflow: hidden;
       touch-action: none;
     }
+
     canvas {
       display: block;
       margin: 0 auto;
@@ -36,7 +51,7 @@
     /* Top Status Bar */
     #hud {
       position: absolute;
-      top: 12px;
+      top: 16px;
       left: 12px;
       right: 12px;
       z-index: 10;
@@ -52,13 +67,12 @@
       font-size: 12px;
       font-weight: bold;
       backdrop-filter: blur(4px);
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
 
-    /* Dialogue / Prompt Box (Pokémon Style) */
+    /* Dialogue Box */
     #dialogue-box {
       position: absolute;
-      top: 60px;
+      top: 64px;
       left: 12px;
       right: 12px;
       z-index: 10;
@@ -75,7 +89,7 @@
     /* Virtual Controls Container */
     #controls {
       position: absolute;
-      bottom: 24px;
+      bottom: 28px;
       left: 16px;
       right: 16px;
       height: 140px;
@@ -86,7 +100,7 @@
       pointer-events: none;
     }
 
-    /* D-PAD (Bottom Left) */
+    /* D-PAD */
     .dpad {
       position: relative;
       width: 120px;
@@ -114,7 +128,7 @@
     #btn-left { top: 40px; left: 0; }
     #btn-right { top: 40px; right: 0; }
 
-    /* Action Button "A" (Bottom Right) */
+    /* Action Button "A" */
     .action-btn {
       width: 70px;
       height: 70px;
@@ -128,10 +142,9 @@
       align-items: center;
       justify-content: center;
       pointer-events: auto;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       backdrop-filter: blur(4px);
     }
-    .action-btn:active { background: rgba(34, 197, 94, 0.8); scale: 0.95; }
+    .action-btn:active { background: rgba(34, 197, 94, 0.8); transform: scale(0.95); }
   </style>
 </head>
 <body>
@@ -143,7 +156,6 @@
 
   <div id="dialogue-box">Walk up to the tilled soil patch and press [A] to plant!</div>
 
-  <!-- Virtual Controls for Mobile -->
   <div id="controls">
     <div class="dpad">
       <div class="dpad-btn" id="btn-up">▲</div>
@@ -184,7 +196,7 @@
       type: Phaser.AUTO,
       width: window.innerWidth,
       height: window.innerHeight,
-      pixelArt: true, // Pokémon Retro Pixel Rendering
+      pixelArt: true,
       scale: {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
@@ -201,48 +213,42 @@
     function create() {
       const scene = this;
 
-      // --- PROCEDURAL RETRO TEXTURES ---
-      // 1. Grid Background Tile (Grass / Floor)
+      // Render Tile Floor
       const tileGfx = scene.make.graphics({ add: false });
       tileGfx.fillStyle(0x1e293b, 1).fillRect(0, 0, 32, 32);
       tileGfx.lineStyle(1, 0x334155, 0.5).strokeRect(0, 0, 32, 32);
       tileGfx.generateTexture('floorTile', 32, 32);
 
-      // Create Tile Grid Floor
-      for (let x = 0; x < window.innerWidth; x += 32) {
-        for (let y = 0; y < window.innerHeight; y += 32) {
-          scene.add.image(x + 16, y + 16, 'floorTile');
+      for (let x = 0; x < window.innerWidth + 64; x += 32) {
+        for (let y = 0; y < window.innerHeight + 64; y += 32) {
+          scene.add.image(x, y, 'floorTile');
         }
       }
 
-      // 2. Soil Patch Sprite
+      // Soil Patch
       const soilGfx = scene.make.graphics({ add: false });
       soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // 3. Player Character Sprite (Retro Blue Red Cap Hero)
+      // Hero Character
       const playerGfx = scene.make.graphics({ add: false });
-      playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24); // Blue Body
-      playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);  // Red Cap
-      playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);  // Face
+      playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24);
+      playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);
+      playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);
       playerGfx.generateTexture('playerTex', 32, 32);
 
-      // Spawn World Objects
       soilPatch = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 - 40, 'soilTex');
       player = scene.physics.add.sprite(window.innerWidth / 2, window.innerHeight / 2 + 80, 'playerTex');
       player.setCollideWorldBounds(true);
 
-      // Keyboard Controls (Desktop testing)
       cursors = scene.input.keyboard.createCursorKeys();
 
-      // Bind Mobile Virtual D-Pad Touch Events
       bindDPad('btn-up', 'up');
       bindDPad('btn-down', 'down');
       bindDPad('btn-left', 'left');
       bindDPad('btn-right', 'right');
 
-      // Bind Action "A" Button
       document.getElementById('btn-action').addEventListener('pointerdown', (e) => {
         e.preventDefault();
         handleInteraction(scene);
@@ -265,7 +271,6 @@
       const dist = Phaser.Math.Distance.Between(player.x, player.y, soilPatch.x, soilPatch.y);
       const dialogue = document.getElementById('dialogue-box');
 
-      // Must be standing close to soil patch (Pokémon interaction style)
       if (dist > 65) {
         dialogue.innerText = "You're too far away from the soil patch!";
         return;
@@ -277,12 +282,12 @@
           savePlayerData(playerData);
 
           currentSoilState = 'GROWING';
-          soilPatch.setTint(0xeab308); // Yellow
+          soilPatch.setTint(0xeab308);
           dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
 
           scene.time.delayedCall(3000, () => {
             currentSoilState = 'READY';
-            soilPatch.setTint(0x22c55e); // Green
+            soilPatch.setTint(0x22c55e);
             dialogue.innerText = "The Sword Crop has fully grown! Press [A] to harvest!";
           });
         } else {
@@ -301,23 +306,14 @@
     }
 
     function update() {
-      // Clear movement velocity
       player.body.setVelocity(0);
 
-      // Handle D-Pad + Arrow Key Movement
-      if (cursors.left.isDown || moveDir.left) {
-        player.body.setVelocityX(-SPEED);
-      } else if (cursors.right.isDown || moveDir.right) {
-        player.body.setVelocityX(SPEED);
-      }
+      if (cursors.left.isDown || moveDir.left) player.body.setVelocityX(-SPEED);
+      else if (cursors.right.isDown || moveDir.right) player.body.setVelocityX(SPEED);
 
-      if (cursors.up.isDown || moveDir.up) {
-        player.body.setVelocityY(-SPEED);
-      } else if (cursors.down.isDown || moveDir.down) {
-        player.body.setVelocityY(SPEED);
-      }
+      if (cursors.up.isDown || moveDir.up) player.body.setVelocityY(-SPEED);
+      else if (cursors.down.isDown || moveDir.down) player.body.setVelocityY(SPEED);
 
-      // Normalize diagonal movement speed
       player.body.velocity.normalize().scale(SPEED);
     }
   </script>
