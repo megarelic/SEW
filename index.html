@@ -43,48 +43,48 @@
 
     /* HUD Bar */
     #hud {
-      position: fixed; top: 12px; left: 20px; right: 20px;
+      position: fixed; top: 12px; left: 16px; right: 16px;
       z-index: 10; display: flex; justify-content: space-between; align-items: center;
       pointer-events: none;
     }
     .hud-box {
       background: rgba(15, 23, 42, 0.85); border: 2px solid rgba(255, 255, 255, 0.15);
-      padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: bold;
+      padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: bold;
       backdrop-filter: blur(4px);
     }
     .hud-btn {
       pointer-events: auto; background: rgba(56, 189, 248, 0.2);
       border: 2px solid #38bdf8; color: #fff; padding: 6px 12px;
-      border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer;
+      border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer;
       backdrop-filter: blur(4px);
     }
     .hud-btn:active { background: rgba(56, 189, 248, 0.6); }
 
     /* Dialogue Box */
     #dialogue-box {
-      position: fixed; top: 48px; left: 20%; right: 20%;
+      position: fixed; top: 48px; left: 15%; right: 15%;
       z-index: 10; background: rgba(15, 23, 42, 0.9);
-      border: 2px solid #38bdf8; padding: 8px 12px; border-radius: 8px;
+      border: 2px solid #38bdf8; padding: 6px 12px; border-radius: 8px;
       font-size: 12px; color: #e2e8f0; pointer-events: none; text-align: center;
     }
 
     /* Controls Overlay */
     #controls {
-      position: fixed; bottom: 20px; left: 20px; right: 20px;
-      height: 120px; z-index: 20; display: flex; justify-content: space-between;
+      position: fixed; bottom: 16px; left: 16px; right: 16px;
+      height: 110px; z-index: 20; display: flex; justify-content: space-between;
       align-items: center; pointer-events: none;
     }
 
     /* Virtual Joystick */
     #joystick-zone {
-      width: 110px; height: 110px; background: rgba(255, 255, 255, 0.1);
+      width: 100px; height: 100px; background: rgba(255, 255, 255, 0.1);
       border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
       position: relative; pointer-events: auto; touch-action: none; backdrop-filter: blur(4px);
     }
     #joystick-knob {
-      width: 44px; height: 44px; background: rgba(56, 189, 248, 0.8);
+      width: 40px; height: 40px; background: rgba(56, 189, 248, 0.8);
       border: 2px solid #ffffff; border-radius: 50%; position: absolute;
-      top: 33px; left: 33px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+      top: 30px; left: 30px; pointer-events: none; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
     }
 
     /* Action Button "A" */
@@ -145,7 +145,7 @@
   </div>
 
   <div id="hud">
-    <div class="hud-box" id="stash-info">Location: Surface Hub | Gold: 🪙 0 | Seeds: 🌰 3</div>
+    <div class="hud-box" id="stash-info">HP: ❤️ 100 | Gold: 🪙 0 | Seeds: 🌰 3</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -198,7 +198,7 @@
 
   <script>
     // --- 1. LOCAL STORAGE ---
-    const DEFAULT_DATA = { gold: 25, seeds: 3, inventory: [] };
+    const DEFAULT_DATA = { hp: 100, maxHp: 100, gold: 25, seeds: 3, inventory: [] };
     function getPlayerData() {
       const saved = localStorage.getItem('SEW_SAVE_DATA');
       return saved ? JSON.parse(saved) : DEFAULT_DATA;
@@ -215,10 +215,10 @@
 
     function updateUI() {
       document.getElementById('stash-info').innerHTML = 
-        `Zone: ${currentZone === 'HUB' ? '🏡 Surface Hub' : '⚔️ Subterranean Dungeon Layer'} | Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
+        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
     }
 
-    // --- 2. MODAL MANAGERS ---
+    // --- 2. MODALS ---
     const invModal = document.getElementById('inventory-modal');
     const shopModal = document.getElementById('shop-modal');
     const invGrid = document.getElementById('inv-grid');
@@ -346,7 +346,15 @@
     // --- 4. PHASER 3 ENGINE & MAP BUILDER ---
     let player, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
+    let dungeonSoilList = [];
+    let dungeonEnemies = [];
+    let dungeonLootList = [];
+    let minimapGfx;
+
     let currentSoilState = 'EMPTY';
+    let dungeonGrid = [];
+    let lastDamageTime = 0;
+
     const SPEED = 150;
     const TILE_SIZE = 32;
     const MAP_GRID_SIZE = 40;
@@ -395,12 +403,21 @@
       playerGfx.fillStyle(0xfbebe8, 1).fillRect(8, 8, 16, 8);
       playerGfx.generateTexture('playerTex', 32, 32);
 
+      const enemyGfx = scene.make.graphics({ add: false });
+      enemyGfx.fillStyle(0xef4444, 1).fillRect(4, 4, 24, 24);
+      enemyGfx.fillStyle(0xfbbf24, 1).fillRect(8, 8, 16, 8);
+      enemyGfx.generateTexture('enemyTex', 32, 32);
+
+      const lootGfx = scene.make.graphics({ add: false });
+      lootGfx.fillStyle(0xf59e0b, 1).fillCircle(12, 12, 10);
+      lootGfx.lineStyle(2, 0xfef08a, 1).strokeCircle(12, 12, 10);
+      lootGfx.generateTexture('lootTex', 24, 24);
+
       const merchantGfx = scene.make.graphics({ add: false });
       merchantGfx.fillStyle(0x8b5cf6, 1).fillRect(4, 0, 24, 12);
       merchantGfx.fillStyle(0xeab308, 1).fillRect(4, 12, 24, 20);
       merchantGfx.generateTexture('merchantTex', 32, 32);
 
-      // Surface Dungeon Door
       const doorGfx = scene.make.graphics({ add: false });
       doorGfx.fillStyle(0x451a03, 1).fillRect(0, 0, 40, 48);
       doorGfx.fillStyle(0x78350f, 1).fillRect(4, 4, 32, 40);
@@ -408,7 +425,6 @@
       doorGfx.fillStyle(0xeab308, 1).fillCircle(12, 26, 3);
       doorGfx.generateTexture('doorTex', 40, 48);
 
-      // Dungeon Exit Door
       const exitGfx = scene.make.graphics({ add: false });
       exitGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 40, 48);
       exitGfx.fillStyle(0x15803d, 1).fillRect(4, 4, 32, 40);
@@ -418,10 +434,17 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      // SPAWN HERO WITH ALWAYS-TOP DEPTH
+      // SPAWN HERO
       player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
       player.setCollideWorldBounds(true);
-      player.setDepth(10); // Player renders above tiles and walls
+      player.setDepth(10);
+      // Trim bounding box so player never gets stuck in doorways
+      player.body.setSize(18, 18).setOffset(7, 7);
+
+      // Minimap Overlay Graphics Component
+      minimapGfx = scene.add.graphics();
+      minimapGfx.setScrollFactor(0);
+      minimapGfx.setDepth(100);
 
       buildHubMap(scene);
 
@@ -466,7 +489,6 @@
       
       dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'doorTex').setDepth(1);
 
-      // Reposition Player & Snap Camera
       if (player) {
         player.setPosition(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2);
         if (player.body) player.body.reset(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2);
@@ -482,9 +504,9 @@
       currentZone = 'DUNGEON';
       clearHub(scene);
 
-      let grid = Array(MAP_GRID_SIZE).fill(null).map(() => Array(MAP_GRID_SIZE).fill(1));
+      dungeonGrid = Array(MAP_GRID_SIZE).fill(null).map(() => Array(MAP_GRID_SIZE).fill(1));
       let rooms = [];
-      const numRooms = 6;
+      const numRooms = 7;
 
       for (let i = 0; i < numRooms; i++) {
         let w = Phaser.Math.Between(5, 8);
@@ -497,12 +519,13 @@
           rooms.push({ x, y, w, h, cx: Math.floor(x + w / 2), cy: Math.floor(y + h / 2) });
           for (let rx = x; rx < x + w; rx++) {
             for (let ry = y; ry < y + h; ry++) {
-              grid[ry][rx] = 0;
+              dungeonGrid[ry][rx] = 0;
             }
           }
         }
       }
 
+      // Carve 2-TILE WIDE CORRIDORS to prevent getting stuck
       for (let i = 0; i < rooms.length - 1; i++) {
         let r1 = rooms[i];
         let r2 = rooms[i + 1];
@@ -510,21 +533,24 @@
         let cy = r1.cy;
 
         while (cx !== r2.cx) {
-          grid[cy][cx] = 0;
+          dungeonGrid[cy][cx] = 0;
+          if (cy + 1 < MAP_GRID_SIZE - 1) dungeonGrid[cy + 1][cx] = 0;
           cx += (r2.cx > cx) ? 1 : -1;
         }
         while (cy !== r2.cy) {
-          grid[cy][cx] = 0;
+          dungeonGrid[cy][cx] = 0;
+          if (cx + 1 < MAP_GRID_SIZE - 1) dungeonGrid[cy][cx + 1] = 0;
           cy += (r2.cy > cy) ? 1 : -1;
         }
       }
 
+      // Render Floor & Static Walls
       for (let y = 0; y < MAP_GRID_SIZE; y++) {
         for (let x = 0; x < MAP_GRID_SIZE; x++) {
           let px = x * TILE_SIZE + TILE_SIZE / 2;
           let py = y * TILE_SIZE + TILE_SIZE / 2;
 
-          if (grid[y][x] === 0) {
+          if (dungeonGrid[y][x] === 0) {
             const floorTile = scene.add.image(px, py, 'dungeonTile');
             floorTile.setDepth(0);
             dungeonFloorTiles.push(floorTile);
@@ -536,22 +562,39 @@
         }
       }
 
-      // Spawn Player inside Room 0 Center
+      // Spawn Player in Room 0
       let startRoom = rooms[0];
       const spawnX = startRoom.cx * TILE_SIZE;
       const spawnY = startRoom.cy * TILE_SIZE;
 
       player.setPosition(spawnX, spawnY);
       if (player.body) player.body.reset(spawnX, spawnY);
-      
-      // Instant Camera Snap to Room 0
       scene.cameras.main.centerOn(spawnX, spawnY);
 
-      // Exit Door spawns inside last Room
+      // Spawn Exit Door in Last Room
       let lastRoom = rooms[rooms.length - 1];
       exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex').setDepth(1);
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Layer Entered! Explore rooms and find the Exit Door to return to the Hub.";
+      // Spawn Dungeon Soil & Enemies in Interior Rooms
+      for (let i = 1; i < rooms.length - 1; i++) {
+        let rm = rooms[i];
+        
+        // Spawn Soil in 50% of interior rooms
+        if (Math.random() > 0.5) {
+          let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'soilTex').setDepth(1);
+          sTile.state = 'EMPTY';
+          dungeonSoilList.push(sTile);
+        }
+
+        // Spawn Enemies
+        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex').setDepth(2);
+        enemy.hp = 30;
+        enemy.body.setSize(20, 20);
+        scene.physics.add.collider(enemy, dungeonWalls);
+        dungeonEnemies.push(enemy);
+      }
+
+      document.getElementById('dialogue-box').innerText = "Dungeon Layer Entered! Explore rooms, slay mobs, and find the Green Exit Door.";
       updateUI();
     }
 
@@ -569,6 +612,17 @@
       if (dungeonWalls) dungeonWalls.clear(true, true);
       dungeonFloorTiles.forEach(t => t.destroy());
       dungeonFloorTiles = [];
+
+      dungeonSoilList.forEach(s => s.destroy());
+      dungeonSoilList = [];
+
+      dungeonEnemies.forEach(e => e.destroy());
+      dungeonEnemies = [];
+
+      dungeonLootList.forEach(l => l.destroy());
+      dungeonLootList = [];
+
+      minimapGfx.clear();
     }
 
     // --- INTERACTION LOGIC ---
@@ -593,43 +647,100 @@
         }
 
         if (distSoil <= 65) {
-          if (currentSoilState === 'EMPTY') {
-            if (playerData.seeds > 0) {
-              playerData.seeds -= 1;
-              savePlayerData(playerData);
-              currentSoilState = 'GROWING';
-              hubSoil.setTint(0xeab308);
-              dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
-              scene.time.delayedCall(3000, () => {
-                currentSoilState = 'READY';
-                hubSoil.setTint(0x22c55e);
-                dialogue.innerText = "The Sword Crop has fully grown! Press [A] to harvest!";
-              });
-            } else { dialogue.innerText = "You have no seeds left! Visit the Merchant to buy more."; }
-          } else if (currentSoilState === 'READY') {
-            currentSoilState = 'EMPTY';
-            hubSoil.clearTint();
-            playerData.inventory.push('Iron Sword');
-            playerData.gold += 15;
-            savePlayerData(playerData);
-            dialogue.innerText = "Harvested an Iron Sword! Sell it to the Merchant for Gold.";
-          }
+          handleSoilInteraction(scene, hubSoil, dialogue);
           return;
         }
       } else if (currentZone === 'DUNGEON') {
+        // 1. Pick up nearby loot
+        for (let i = dungeonLootList.length - 1; i >= 0; i--) {
+          let loot = dungeonLootList[i];
+          if (Phaser.Math.Distance.Between(player.x, player.y, loot.x, loot.y) <= 50) {
+            playerData.gold += loot.rewardGold;
+            playerData.seeds += loot.rewardSeeds;
+            savePlayerData(playerData);
+            dialogue.innerText = `Looted 🪙 ${loot.rewardGold} Gold & 🌰 ${loot.rewardSeeds} Seed!`;
+            loot.destroy();
+            dungeonLootList.splice(i, 1);
+            return;
+          }
+        }
+
+        // 2. Attack nearby enemy
+        for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
+          let mob = dungeonEnemies[i];
+          if (Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y) <= 60) {
+            let hasSword = playerData.inventory.includes('Iron Sword');
+            let damage = hasSword ? 20 : 10;
+            mob.hp -= damage;
+            mob.setTint(0xffffff);
+            scene.time.delayedCall(150, () => mob.clearTint());
+
+            dialogue.innerText = `Attacked enemy for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
+
+            if (mob.hp <= 0) {
+              // Spawn Loot Drop
+              let loot = scene.physics.add.sprite(mob.x, mob.y, 'lootTex').setDepth(2);
+              loot.rewardGold = Phaser.Math.Between(10, 25);
+              loot.rewardSeeds = Math.random() > 0.5 ? 1 : 0;
+              dungeonLootList.push(loot);
+
+              dialogue.innerText = "Enemy defeated! Walk over the Gold Pouch and press [A] to loot.";
+              mob.destroy();
+              dungeonEnemies.splice(i, 1);
+            }
+            return;
+          }
+        }
+
+        // 3. Interact with Dungeon Soil
+        for (let dSoil of dungeonSoilList) {
+          if (Phaser.Math.Distance.Between(player.x, player.y, dSoil.x, dSoil.y) <= 60) {
+            handleSoilInteraction(scene, dSoil, dialogue);
+            return;
+          }
+        }
+
+        // 4. Exit Door
         const distExit = Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y);
         if (distExit <= 65) {
           buildHubMap(scene);
           return;
         }
-        dialogue.innerText = "Find the Green Exit Door in the final room to extract!";
+
+        dialogue.innerText = "Press [A] near enemies to attack or over items to loot!";
       }
     }
 
-    function update() {
+    function handleSoilInteraction(scene, soilObj, dialogue) {
+      if (soilObj.state === 'EMPTY') {
+        if (playerData.seeds > 0) {
+          playerData.seeds -= 1;
+          savePlayerData(playerData);
+          soilObj.state = 'GROWING';
+          soilObj.setTint(0xeab308);
+          dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
+          scene.time.delayedCall(3000, () => {
+            soilObj.state = 'READY';
+            soilObj.setTint(0x22c55e);
+            dialogue.innerText = "The Sword Crop has fully grown! Press [A] to harvest!";
+          });
+        } else { dialogue.innerText = "You have no seeds left! Visit the Merchant to buy more."; }
+      } else if (soilObj.state === 'READY') {
+        soilObj.state = 'EMPTY';
+        soilObj.clearTint();
+        playerData.inventory.push('Iron Sword');
+        playerData.gold += 15;
+        savePlayerData(playerData);
+        dialogue.innerText = "Harvested an Iron Sword! Added to your inventory.";
+      }
+    }
+
+    // --- GAME LOOP & RADAR MINIMAP RENDERER ---
+    function update(time, delta) {
       player.body.setVelocity(0);
       if (isInventoryOpen || isShopOpen) return;
 
+      // Player Movement
       if (joystickActive) {
         player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
       } else {
@@ -641,6 +752,85 @@
 
         player.body.velocity.normalize().scale(SPEED);
       }
+
+      // Dungeon Enemy AI & Contact Damage
+      if (currentZone === 'DUNGEON') {
+        dungeonEnemies.forEach(mob => {
+          let dist = Phaser.Math.Distance.Between(mob.x, mob.y, player.x, player.y);
+          if (dist < 180 && dist > 25) {
+            game.scene.scenes[0].physics.moveToObject(mob, player, 65);
+          } else {
+            mob.body.setVelocity(0);
+          }
+
+          if (dist <= 25 && time > lastDamageTime + 1000) {
+            lastDamageTime = time;
+            playerData.hp = Math.max(0, playerData.hp - 10);
+            savePlayerData(playerData);
+            player.setTint(0xef4444);
+            game.scene.scenes[0].time.delayedCall(200, () => player.clearTint());
+
+            if (playerData.hp <= 0) {
+              playerData.hp = playerData.maxHp;
+              savePlayerData(playerData);
+              document.getElementById('dialogue-box').innerText = "You passed out in the dungeon! Emergency extracted to Hub.";
+              buildHubMap(game.scene.scenes[0]);
+            }
+          }
+        });
+
+        drawMinimap();
+      } else {
+        minimapGfx.clear();
+      }
+    }
+
+    // Render Minimap in Top Right Corner
+    function drawMinimap() {
+      minimapGfx.clear();
+      const mapSize = 90;
+      const margin = 16;
+      const startX = window.innerWidth - mapSize - margin;
+      const startY = 48;
+      const scale = mapSize / MAP_GRID_SIZE;
+
+      // Map Background
+      minimapGfx.fillStyle(0x0f172a, 0.85);
+      minimapGfx.fillRect(startX, startY, mapSize, mapSize);
+      minimapGfx.lineStyle(1, 0x38bdf8, 0.8);
+      minimapGfx.strokeRect(startX, startY, mapSize, mapSize);
+
+      // Floor Grid
+      minimapGfx.fillStyle(0x334155, 1);
+      for (let y = 0; y < MAP_GRID_SIZE; y++) {
+        for (let x = 0; x < MAP_GRID_SIZE; x++) {
+          if (dungeonGrid[y][x] === 0) {
+            minimapGfx.fillRect(startX + x * scale, startY + y * scale, Math.max(1, scale), Math.max(1, scale));
+          }
+        }
+      }
+
+      // Exit Door Dot (Green)
+      if (exitDoor) {
+        let ex = Math.floor(exitDoor.x / TILE_SIZE) * scale;
+        let ey = Math.floor(exitDoor.y / TILE_SIZE) * scale;
+        minimapGfx.fillStyle(0x22c55e, 1);
+        minimapGfx.fillRect(startX + ex, startY + ey, 3, 3);
+      }
+
+      // Enemies Dots (Red)
+      minimapGfx.fillStyle(0xef4444, 1);
+      dungeonEnemies.forEach(mob => {
+        let mx = Math.floor(mob.x / TILE_SIZE) * scale;
+        let my = Math.floor(mob.y / TILE_SIZE) * scale;
+        minimapGfx.fillRect(startX + mx, startY + my, 2, 2);
+      });
+
+      // Player Dot (Cyan)
+      let px = Math.floor(player.x / TILE_SIZE) * scale;
+      let py = Math.floor(player.y / TILE_SIZE) * scale;
+      minimapGfx.fillStyle(0x38bdf8, 1);
+      minimapGfx.fillRect(startX + px - 1, startY + py - 1, 3, 3);
     }
   </script>
 </body>
