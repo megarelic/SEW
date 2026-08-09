@@ -148,11 +148,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.5</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.6</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Kenney player sprite integrated with horizontal flip focus!</div>
+  <div id="dialogue-box">Surface Hub: Kenney 16x16 Tilemap with 1px gap loaded successfully!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -217,7 +217,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.5';
+    const GAME_VERSION = 'v1.4.6';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -557,7 +557,7 @@
       joystickVector = { x: dx / maxRadius, y: dy / maxRadius };
     }
 
-    // --- 4. PHASER 3 ENGINE & KENNEY SPRITE LOADER ---
+    // --- 4. PHASER 3 ENGINE & KENNEY TILEMAP LOADER (16x16 with 1px gap) ---
     let player, aimReticle, swordSlash, arrowProj, cursors, hubSoil, merchant, dungeonDoor, exitDoor;
     let dungeonWalls, dungeonFloorTiles = [];
     let dungeonSoilList = [];
@@ -576,7 +576,7 @@
     let aimAngle = 0;
 
     const SPEED = 150;
-    const TILE_SIZE = 32;
+    const TILE_SIZE = 32; // Render scale
     const MAP_GRID_SIZE = 40;
     const WORLD_SIZE = MAP_GRID_SIZE * TILE_SIZE;
 
@@ -594,33 +594,18 @@
 
     function preload() {
       const scene = this;
-      // Load Kenney player sprite directly from GitHub repo URL
-      scene.load.image('playerSprite', 'https://raw.githubusercontent.com/megarelic/SEW/main/tile_0084.png');
+      // Load 16x16 tilemap with 1px margin and 1px spacing
+      scene.load.spritesheet('tiles', 'https://raw.githubusercontent.com/megarelic/SEW/refs/heads/main/tilemap.png', {
+        frameWidth: 16,
+        frameHeight: 16,
+        margin: 1,
+        spacing: 1
+      });
     }
 
     function create() {
       const scene = this;
       scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
-
-      const grassGfx = scene.make.graphics({ add: false });
-      grassGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 32, 32);
-      grassGfx.lineStyle(1, 0x1e293b, 0.5).strokeRect(0, 0, 32, 32);
-      grassGfx.generateTexture('hubTile', 32, 32);
-
-      const dungGfx = scene.make.graphics({ add: false });
-      dungGfx.fillStyle(0x334155, 1).fillRect(0, 0, 32, 32);
-      dungGfx.lineStyle(1, 0x475569, 0.5).strokeRect(0, 0, 32, 32);
-      dungGfx.generateTexture('dungeonTile', 32, 32);
-
-      const wallTexGfx = scene.make.graphics({ add: false });
-      wallTexGfx.fillStyle(0x64748b, 1).fillRect(0, 0, 32, 32);
-      wallTexGfx.lineStyle(2, 0x0f172a, 0.8).strokeRect(0, 0, 32, 32);
-      wallTexGfx.generateTexture('wallTile', 32, 32);
-
-      const soilGfx = scene.make.graphics({ add: false });
-      soilGfx.fillStyle(0x78350f, 1).fillRect(0, 0, 48, 48);
-      soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
-      soilGfx.generateTexture('soilTex', 48, 48);
 
       const slashGfx = scene.make.graphics({ add: false });
       slashGfx.fillStyle(0x38bdf8, 0.7);
@@ -633,42 +618,15 @@
       arrowProjGfx.fillRect(12, 14, 16, 4);
       arrowProjGfx.generateTexture('arrowTex', 32, 32);
 
-      const enemyGfx = scene.make.graphics({ add: false });
-      enemyGfx.fillStyle(0xef4444, 1).fillCircle(16, 16, 10);
-      enemyGfx.fillStyle(0xfbbf24, 1).fillCircle(16, 12, 5);
-      enemyGfx.generateTexture('enemyTex', 32, 32);
-
-      const corpseGfx = scene.make.graphics({ add: false });
-      corpseGfx.fillStyle(0x475569, 1).fillCircle(16, 16, 10);
-      corpseGfx.generateTexture('corpseTex', 32, 32);
-
-      const merchantGfx = scene.make.graphics({ add: false });
-      merchantGfx.fillStyle(0x8b5cf6, 1).fillCircle(16, 16, 11);
-      merchantGfx.fillStyle(0xeab308, 1).fillCircle(16, 12, 6);
-      merchantGfx.generateTexture('merchantTex', 32, 32);
-
-      const doorGfx = scene.make.graphics({ add: false });
-      doorGfx.fillStyle(0x451a03, 1).fillRect(0, 0, 40, 48);
-      doorGfx.fillStyle(0x78350f, 1).fillRect(4, 4, 32, 40);
-      doorGfx.lineStyle(2, 0x271003, 1).strokeRect(4, 4, 32, 40);
-      doorGfx.fillStyle(0xeab308, 1).fillCircle(12, 26, 3);
-      doorGfx.generateTexture('doorTex', 40, 48);
-
-      const exitGfx = scene.make.graphics({ add: false });
-      exitGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 40, 48);
-      exitGfx.fillStyle(0x15803d, 1).fillRect(4, 4, 32, 40);
-      exitGfx.lineStyle(2, 0x22c55e, 1).strokeRect(4, 4, 32, 40);
-      exitGfx.fillStyle(0x86efac, 1).fillCircle(12, 26, 3);
-      exitGfx.generateTexture('exitDoorTex', 40, 48);
-
       dungeonWalls = scene.physics.add.staticGroup();
 
-      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerSprite');
+      // Player sprite using Kenney tile index (e.g., frame 113 for player character in row 8)
+      player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'tiles', 113);
+      player.setScale(2); // Scale 16x16 up to 32x32 world size
       player.setCollideWorldBounds(true);
       player.setDepth(10);
-      player.body.setSize(18, 18).setOffset(7, 7);
+      player.body.setSize(14, 14).setOffset(1, 1);
 
-      // Aim reticle dot to show aim direction without rotating player sprite
       aimReticle = scene.add.circle(0, 0, 4, 0x38bdf8).setDepth(12);
 
       swordSlash = scene.add.sprite(0, 0, 'slashTex').setDepth(11).setVisible(false);
@@ -737,7 +695,7 @@
           if (targetSoil.state === 'READY') {
             if (distToPlayer <= 60) {
               targetSoil.state = 'EMPTY';
-              targetSoil.clearTint();
+              targetSoil.setFrame(36); // Ground tile
               let harvestedWeapon = generateUniqueWeapon(targetSoil.seedType === 'Bow Seed' ? 'bow' : 'sword');
               addPlayerItem(harvestedWeapon);
               addPlayerItem({ name: 'Gold', count: 15 });
@@ -835,17 +793,21 @@
 
       for (let x = 0; x < WORLD_SIZE; x += 32) {
         for (let y = 0; y < WORLD_SIZE; y += 32) {
-          const tile = scene.add.image(x + 16, y + 16, 'hubTile').setDepth(0);
+          const tile = scene.add.image(x + 16, y + 16, 'tiles', 36).setDisplaySize(32, 32).setDepth(0);
           dungeonFloorTiles.push(tile);
         }
       }
 
-      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'soilTex').setDepth(1);
+      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'tiles', 35);
+      hubSoil.setScale(2);
       hubSoil.state = 'EMPTY';
-      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'merchantTex').setDepth(1);
+
+      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'tiles', 114);
+      merchant.setScale(2);
       merchant.setImmovable(true);
       
-      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'doorTex').setDepth(1);
+      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'tiles', 14);
+      dungeonDoor.setScale(2);
 
       if (player) {
         player.setPosition(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2);
@@ -853,7 +815,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Kenney sprite with horizontal flip focus active!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Kenney Tilemap active!";
       updateUI();
     }
 
@@ -906,10 +868,11 @@
           let py = y * TILE_SIZE + TILE_SIZE / 2;
 
           if (dungeonGrid[y][x] === 0) {
-            const floorTile = scene.add.image(px, py, 'dungeonTile').setDepth(0);
+            const floorTile = scene.add.image(px, py, 'tiles', 37).setDisplaySize(32, 32).setDepth(0);
             dungeonFloorTiles.push(floorTile);
           } else {
-            let wall = dungeonWalls.create(px, py, 'wallTile').setDepth(1);
+            let wall = dungeonWalls.create(px, py, 'tiles', 32);
+            wall.setScale(2);
             wall.refreshBody();
           }
         }
@@ -938,18 +901,20 @@
         let rm = rooms[i];
         if (rm === startRoom) continue;
 
-        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'enemyTex').setDepth(2);
+        let enemy = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE + 20, 'tiles', 128);
+        enemy.setScale(2);
         enemy.maxHp = 40;
         enemy.hp = 40;
         enemy.showHp = false;
-        enemy.body.setSize(20, 20);
+        enemy.body.setSize(14, 14);
         enemy.hpBar = scene.add.graphics().setDepth(3);
         updateEnemyHpBar(enemy);
         scene.physics.add.collider(enemy, dungeonWalls);
         dungeonEnemies.push(enemy);
 
         if (Math.random() > 0.5) {
-          let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'soilTex').setDepth(1);
+          let sTile = scene.physics.add.sprite(rm.cx * TILE_SIZE, rm.cy * TILE_SIZE - 30, 'tiles', 35);
+          sTile.setScale(2);
           sTile.state = 'EMPTY';
           dungeonSoilList.push(sTile);
         }
@@ -1019,7 +984,9 @@
           if (vineCurrentIndex >= vinePathNodes.length - 1) {
             if (!exitDoor) {
               let finalNode = vinePathNodes[vinePathNodes.length - 1];
-              exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'exitDoorTex').setDepth(1);
+              exitDoor = scene.physics.add.sprite(finalNode.x * TILE_SIZE + TILE_SIZE/2, finalNode.y * TILE_SIZE + TILE_SIZE/2, 'tiles', 15);
+              exitDoor.setScale(2);
+              exitDoor.setDepth(1);
               document.getElementById('dialogue-box').innerText = "The vine reached the far room and blossomed into the Exit Door!";
             }
             return;
@@ -1124,7 +1091,8 @@
           
           scene.time.delayedCall(3000, () => {
             targetSoil.state = 'READY';
-            targetSoil.setTint(0x22c55e);
+            targetSoil.clearTint();
+            targetSoil.setFrame(34); // Mature crop tile
             dialogue.innerText = `The ${chosenSeed} crop is fully grown! Click to harvest!`;
           });
         } else { dialogue.innerText = "You have no seeds left! Visit Merchant to buy more."; }
@@ -1164,7 +1132,9 @@
 
               if (mob.hp <= 0) {
                 if (mob.hpBar) mob.hpBar.destroy();
-                let corpse = scene.physics.add.sprite(mob.x, mob.y, 'corpseTex').setDepth(1);
+                let corpse = scene.physics.add.sprite(mob.x, mob.y, 'tiles', 129);
+                corpse.setScale(2);
+                corpse.setDepth(1);
                 
                 corpse.items = [
                   { name: 'Gold', count: Phaser.Math.Between(10, 20) },
@@ -1204,7 +1174,6 @@
       if (joystickActive) {
         aimAngle = Math.atan2(joystickVector.y, joystickVector.x);
 
-        // Flip sprite horizontally based on joystick direction
         if (joystickVector.x < -0.1) {
           player.setFlipX(true);
         } else if (joystickVector.x > 0.1) {
@@ -1236,7 +1205,6 @@
         player.body.velocity.normalize().scale(SPEED);
       }
 
-      // Position aim reticle slightly in front of the player based on aimAngle
       if (aimReticle) {
         aimReticle.setPosition(
           player.x + Math.cos(aimAngle) * 24,
@@ -1257,7 +1225,9 @@
 
             if (mob.hp <= 0) {
               if (mob.hpBar) mob.hpBar.destroy();
-              let corpse = game.scene.scenes[0].physics.add.sprite(mob.x, mob.y, 'corpseTex').setDepth(1);
+              let corpse = game.scene.scenes[0].physics.add.sprite(mob.x, mob.y, 'tiles', 129);
+              corpse.setScale(2);
+              corpse.setDepth(1);
               corpse.items = [
                 { name: 'Gold', count: Phaser.Math.Between(10, 20) },
                 generateUniqueWeapon(Math.random() > 0.4 ? 'sword' : 'bow')
