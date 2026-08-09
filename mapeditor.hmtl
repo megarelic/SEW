@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mobile Tilemap Editor</title>
+    <style>
+        * { box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #fff; }
+        #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+        #canvas-container { flex: 1; position: relative; overflow: hidden; background: #181818; display: flex; justify-content: center; align-items: center; }
+        canvas { display: block; background: #222; }
+        
+        /* UI Overlays */
+        #top-bar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 5; }
+        .hud-badge { background: rgba(0, 0, 0, 0.7); padding: 6px 12px; border-radius: 20px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); pointer-events: auto; backdrop-filter: blur(4px); }
+
+        #toolbar { height: 75px; background: #202020; display: flex; align-items: center; justify-content: space-around; padding: 0 8px; border-top: 1px solid #333; z-index: 10; flex-shrink: 0; }
+        .tool-btn { background: #2c2c2c; color: white; border: 1px solid #444; padding: 10px 12px; border-radius: 8px; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 60px; }
+        .tool-btn:active, .tool-btn.active { background: #00bcd4; color: #000; border-color: #00bcd4; }
+        
+        /* Drawer for Tileset Palette */
+        #palette-drawer { position: absolute; bottom: 75px; left: 0; right: 0; max-height: 45vh; background: rgba(25,25,25,0.95); border-top: 1px solid #444; backdrop-filter: blur(10px); transition: transform 0.3s ease; transform: translateY(100%); z-index: 8; display: flex; flex-direction: column; }
+        #palette-drawer.open { transform: translateY(0); }
+        .palette-header { padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; font-size: 13px; font-weight: bold; }
+        .palette-content { padding: 10px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .tileset-preview-group { margin-bottom: 15px; width: 100%; display: flex; flex-direction: column; align-items: center; }
+        .tileset-name { font-size: 11px; color: #888; margin-bottom: 5px; }
+        canvas.tileset-canvas { border: 1px solid #444; border-radius: 4px; cursor: pointer; }
+        canvas.tileset-canvas.selected { border-color: #00bcd4; box-shadow: 0 0 8px rgba(0,188,212,0.5); }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="canvas-container">
+            <div id="top-bar">
+                <div class="hud-badge" id="hudInfo">Layer: 0 | Zoom: 1.0x</div>
+                <div class="hud-badge" id="hudTool">Mode: Paint</div>
+            </div>
+            <canvas id="editorCanvas"></canvas>
+        </div>
+
+        <!-- Tile Selector Drawer -->
+        <div id="palette-drawer">
+            <div class="palette-header">
+                <span>SELECT TILE FROM TILESETS</span>
+                <span id="closePalette" style="cursor:pointer; padding: 0 5px;">✕</span>
+            </div>
+            <div class="palette-content" id="paletteContainer">
+                <div style="color: #666; font-size: 13px; text-align: center; padding: 20px;">Upload a tileset image using the toolbar below.</div>
+            </div>
+        </div>
+
+        <!-- Bottom Toolbar -->
+        <div id="toolbar">
+            <label class="tool-btn">
+                📁 Upload
+                <input type="file" id="uploadTiles" multiple accept="image/*" style="display:none;">
+            </label>
+            <button class="tool-btn" id="btnPalette">🖼️ Tiles</button>
+            <button class="tool-btn" id="btnRotate">🔄 0°</button>
+            <button class="tool-btn" id="btnLayer">📑 Layer 0</button>
+            <button class="tool-btn" id="btnMode">🖌️ Paint</button>
+            <button class="tool-btn" id="btnExport">💾 Export</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('editorCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Config
+        const TILE_SIZE = 32;
+        const MAP_WIDTH = 25;
+        const MAP_HEIGHT = 25;
+
+        // Viewport State
+        let scale = 1;
+        let panX = 0;
+        let panY = 0;
+
+        // Editor State
+        let currentLayer = 0;
+        let maxLayers = 3;
+        let currentRotation = 0; // 0, 90, 180, 270
+        let currentMode = 'paint'; // 'paint', 'erase', 'pan'
+        let tilesets = []; // Array of Image objects & metadata
+        let selectedTile = { tilesetIndex: 0, tileX: 0, tileY: 0 };
+        let activePaletteSource = { tilesetIndex: 0, tileX: 0, tileY: 0 };
+
+        // Multi-layer map structure: layers[layerIndex][y][x] = tileObj or null
+        let layers = Array(maxLayers).fill(0).map(() => 
+            Array(MAP_HEIGHT).fill(0).map(() => Array(MAP_WIDTH).fill(null))
+        );
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // UI Elements & Bindings
+        const hudInfo = document.getElementById('hudInfo');
+        const hudTool = document.getElementById('hudTool');
+        const paletteDrawer = document.getElementById('palette-drawer');
+        const paletteContainer = document.getElementById('paletteContainer');
+
+        function updateHUD() {
+            hudInfo.textContent = `Layer: ${currentLayer} | Zoom: ${scale.toFixed(1)}x`;
+            hudTool.textContent = `Mode: ${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)}`;
+        }
+
+        // Handle File Uploads (Multiple Tilesets)
+        document.getElementById('uploadTiles').addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (!files.length) return;
+
+            Array.from(files).forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        tilesets.push({
+                            name: file.name,
+                            image: img,
+                            cols: Math.floor(img.width / TILE_SIZE),
+                            rows: Math.floor(img.height / TILE_SIZE)
+                        });
+                        rebuildPaletteUI();
+                        if (tilesets.length === 1) {
+                            paletteDrawer.classList.add('open');
+                        }
+                    };
+                };
+                reader.readAsDataURL(file);
+            });
+            e.target.value = ''; // Reset input
+        });
+
+        function rebuildPaletteUI() {
+            paletteContainer.innerHTML = '';
+            if (tilesets.length === 0) {
+                paletteContainer.innerHTML = '<div style="color: #666; font-size: 13px; text-align: center; padding: 20px;">Upload a tileset image using the toolbar below.</div>';
+                return;
+            }
+
+            tilesets.forEach((ts, tsIndex) => {
+                const group = document.createElement('div');
+                group.className = 'tileset-preview-group';
+                
+                const label = document.createElement('div');
+                label.className = 'tileset-name';
+                label.textContent = ts.name;
+                group.appendChild(label);
+
+                const tsCanvas = document.createElement('canvas');
+                tsCanvas.className = 'tileset-canvas';
+                tsCanvas.width = ts.image.width;
+                tsCanvas.height = ts.image.height;
+                const tsCtx = tsCanvas.getContext('2d');
+                tsCtx.drawImage(ts.image, 0, 0);
+
+                // Selection border overlay logic via click
+                tsCanvas.addEventListener('click', (e) => {
+                    const rect = tsCanvas.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const clickY = e.clientY - rect.top;
+                    const tX = Math.floor(clickX / TILE_SIZE);
+                    const tY = Math.floor(clickY / TILE_SIZE);
+
+                    if (tX < ts.cols && tY < ts.rows) {
+                        selectedTile = { tilesetIndex: tsIndex, tileX: tX, tileY: tY };
+                        paletteDrawer.classList.remove('open');
+                    }
+                });
+
+                group.appendChild(tsCanvas);
+                paletteContainer.appendChild(group);
+            });
+        }
+
+        // Drawer Controls
+        document.getElementById('btnPalette').addEventListener('click', () => {
+            paletteDrawer.classList.toggle('open');
+        });
+        document.getElementById('closePalette').addEventListener('click', () => {
+            paletteDrawer.classList.remove('open');
+        });
+
+        // Rotation Control
+        const btnRotate = document.getElementById('btnRotate');
+        btnRotate.addEventListener('click', () => {
+            currentRotation = (currentRotation + 90) % 360;
+            btnRotate.textContent = `🔄 ${currentRotation}°`;
+        });
+
+        // Layer Switching
+        const btnLayer = document.getElementById('btnLayer');
+        btnLayer.addEventListener('click', () => {
+            currentLayer = (currentLayer + 1) % maxLayers;
+            btnLayer.textContent = `📑 Layer ${currentLayer}`;
+            updateHUD();
+            draw();
+        });
+
+        // Mode Switching
+        const btnMode = document.getElementById('btnMode');
+        btnMode.addEventListener('click', () => {
+            if (currentMode === 'paint') currentMode = 'erase';
+            else if (currentMode === 'erase') currentMode = 'pan';
+            else currentMode = 'paint';
+            
+            btnMode.textContent = currentMode === 'paint' ? '🖌️ Paint' : currentMode === 'erase' ? '橡 Erase' : '🖐️ Pan';
+            updateHUD();
+        });
+
+        // Export System
+        document.getElementById('btnExport').addEventListener('click', () => {
+            const exportData = {
+                width: MAP_WIDTH,
+                height: MAP_HEIGHT,
+                tileSize: TILE_SIZE,
+                layers: layers
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "tilemap_export.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        // Main Draw Loop
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(canvas.width / 2 + panX, canvas.height / 2 + panY);
+            ctx.scale(scale, scale);
+
+            const mapPixelW = MAP_WIDTH * TILE_SIZE;
+            const mapPixelH = MAP_HEIGHT * TILE_SIZE;
+            const originX = -mapPixelW / 2;
+            const originY = -mapPixelH / 2;
+
+            // Background Boundary Box
+            ctx.fillStyle = '#1c1c1c';
+            ctx.fillRect(originX, originY, mapPixelW, mapPixelH);
+
+            // Render Layers
+            for (let l = 0; l < layers.length; l++) {
+                // Dim inactive layers slightly for editing focus
+                ctx.globalAlpha = (l === currentLayer) ? 1.0 : 0.35;
+
+                for (let y = 0; y < MAP_HEIGHT; y++) {
+                    for (let x = 0; x < MAP_WIDTH; x++) {
+                        const tile = layers[l][y][x];
+                        const drawX = originX + (x * TILE_SIZE);
+                        const drawY = originY + (y * TILE_SIZE);
+
+                        if (tile && tilesets[tile.tilesetIndex]) {
+                            const ts = tilesets[tile.tilesetIndex];
+                            ctx.save();
+                            ctx.translate(drawX + TILE_SIZE / 2, drawY + TILE_SIZE / 2);
+                            ctx.rotate((tile.rotation * Math.PI) / 180);
+                            ctx.drawImage(
+                                ts.image,
+                                tile.tileX * TILE_SIZE, tile.tileY * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+                                -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE
+                            );
+                            ctx.restore();
+                        }
+                    }
+                }
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Draw Grid Lines on Top Layer
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1 / scale;
+            for (let x = 0; x <= MAP_WIDTH; x++) {
+                ctx.beginPath();
+                ctx.moveTo(originX + x * TILE_SIZE, originY);
+                ctx.lineTo(originX + x * TILE_SIZE, originY + mapPixelH);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= MAP_HEIGHT; y++) {
+                ctx.beginPath();
+                ctx.moveTo(originX, originY + y * TILE_SIZE);
+                ctx.lineTo(originX + mapPixelW, originY + y * TILE_SIZE);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // Pointer & Multi-Touch Gestures Handling (Pan, Zoom, Paint)
+        let pointers = new Map();
+        let initialPinchDistance = null;
+        let initialScale = 1;
+
+        canvas.addEventListener('pointerdown', (e) => {
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            paletteDrawer.classList.remove('open'); // Close drawer if open during canvas interaction
+
+            if (pointers.size === 1) {
+                handleInteraction(e, false);
+            } else if (pointers.size === 2) {
+                initialPinchDistance = getPinchDistance();
+                initialScale = scale;
+            }
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!pointers.has(e.pointerId)) return;
+            const prev = pointers.get(e.pointerId);
+            pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (pointers.size === 2 && initialPinchDistance) {
+                // Handle Pinch Zoom
+                const currentDistance = getPinchDistance();
+                const scaleFactor = currentDistance / initialPinchDistance;
+                scale = Math.min(Math.max(0.5, initialScale * scaleFactor), 4.0);
+                updateHUD();
+                draw();
+            } else if (pointers.size === 1) {
+                if (currentMode === 'pan') {
+                    panX += e.clientX - prev.x;
+                    panY += e.clientY - prev.y;
+                    draw();
+                } else {
+                    handleInteraction(e, true);
+                }
+            }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            pointers.delete(e.pointerId);
+            if (pointers.size < 2) {
+                initialPinchDistance = null;
+            }
+        });
+
+        window.addEventListener('pointercancel', (e) => {
+            pointers.delete(e.pointerId);
+        });
+
+        function getPinchDistance() {
+            const pts = Array.from(pointers.values());
+            return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        }
+
+        function handleInteraction(e, isDragging) {
+            if (currentMode === 'pan') return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+
+            // Screen to Map coordinate conversion accounting for centering and zoom/pan matrix
+            const worldX = clientX - (canvas.width / 2 + panX);
+            const worldY = clientY - (canvas.height / 2 + panY);
+
+            const mapPixelW = MAP_WIDTH * TILE_SIZE;
+            const mapPixelH = MAP_HEIGHT * TILE_SIZE;
+            const originX = -mapPixelW / 2;
+            const originY = -mapPixelH / 2;
+
+            const tileX = Math.floor((worldX - originX) / (TILE_SIZE * scale));
+            const tileY = Math.floor((worldY - originY) / (TILE_SIZE * scale));
+
+            if (tileX >= 0 && tileX < MAP_WIDTH && tileY >= 0 && tileY < MAP_HEIGHT) {
+                if (currentMode === 'paint' && tilesets.length > 0) {
+                    layers[currentLayer][tileY][tileX] = {
+                        tilesetIndex: selectedTile.tilesetIndex,
+                        tileX: selectedTile.tileX,
+                        tileY: selectedTile.tileY,
+                        rotation: currentRotation
+                    };
+                    draw();
+                } else if (currentMode === 'erase') {
+                    layers[currentLayer][tileY][tileX] = null;
+                    draw();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
