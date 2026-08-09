@@ -148,7 +148,7 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.3</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.4</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -213,7 +213,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.3.3';
+    const GAME_VERSION = 'v1.3.4';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
@@ -502,7 +502,7 @@
     let dungeonCorpses = [];
     let minimapGfx;
 
-    // Organic Connected Vine System Variables
+    // Connected Organic Vine System Variables
     let vinePathNodes = [];
     let vineCurrentIndex = 0;
     let vineEvent = null;
@@ -554,7 +554,6 @@
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // Goo Texture
       const gooGfx = scene.make.graphics({ add: false });
       gooGfx.fillStyle(0x10b981, 0.7);
       gooGfx.fillCircle(16, 16, 12);
@@ -747,7 +746,7 @@
         }
       }
 
-      // --- RANDOMIZED ORGANIC CONNECTED VINE SYSTEM ---
+      // --- RANDOMIZED ORGANIC CONNECTED VINE SYSTEM (WALKABLE FLOOR ONLY) ---
       vinePathNodes = [];
       vineCurrentIndex = 0;
       vineGraphics = scene.add.graphics().setDepth(1);
@@ -760,8 +759,10 @@
 
       vinePathNodes.push({ x: currX, y: currY, spawnType: 'NONE' });
 
-      // Build random wandering path nodes towards target room
-      while (currX !== targetX || currY !== targetY) {
+      // Build random wandering path strictly inside walkable dungeon tiles (dungeonGrid === 0)
+      let safetyCount = 0;
+      while ((currX !== targetX || currY !== targetY) && safetyCount < 300) {
+        safetyCount++;
         let steps = [{x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}];
         Phaser.Utils.Array.Shuffle(steps);
         
@@ -770,7 +771,6 @@
           let nx = currX + s.x;
           let ny = currY + s.y;
           if (nx > 0 && nx < MAP_GRID_SIZE - 1 && ny > 0 && ny < MAP_GRID_SIZE - 1 && dungeonGrid[ny][nx] === 0) {
-            // Favor getting closer to target or occasional organic wandering
             if (Math.abs(targetX - nx) + Math.abs(targetY - ny) <= Math.abs(targetX - currX) + Math.abs(targetY - currY) || Math.random() < 0.3) {
               currX = nx;
               currY = ny;
@@ -787,8 +787,13 @@
           }
         }
         if (!moved) {
-          if (currX !== targetX) currX += (targetX > currX) ? 1 : -1;
-          else if (currY !== targetY) currY += (targetY > currY) ? 1 : -1;
+          if (currX !== targetX && dungeonGrid[currY][(targetX > currX) ? currX + 1 : currX - 1] === 0) {
+            currX += (targetX > currX) ? 1 : -1;
+          } else if (currY !== targetY && dungeonGrid[(targetY > currY) ? currY + 1 : currY - 1][currX] === 0) {
+            currY += (targetY > currY) ? 1 : -1;
+          } else {
+            break; // If fully cornered, snap directly to target room node
+          }
           vinePathNodes.push({ x: currX, y: currY, spawnType: 'NONE' });
         }
       }
@@ -841,7 +846,7 @@
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The organic vine creeps through the caverns, spawning hazards!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The organic vine creeps safely along walkable floors, spawning hazards!";
       updateUI();
     }
 
