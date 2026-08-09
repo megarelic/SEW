@@ -400,28 +400,30 @@
       merchantGfx.fillStyle(0xeab308, 1).fillRect(4, 12, 24, 20);
       merchantGfx.generateTexture('merchantTex', 32, 32);
 
-      // Surface Dungeon Door (Wooden Frame + Brass Knob)
+      // Surface Dungeon Door
       const doorGfx = scene.make.graphics({ add: false });
-      doorGfx.fillStyle(0x451a03, 1).fillRect(0, 0, 40, 48);  // Outer Stone/Wood Arch
-      doorGfx.fillStyle(0x78350f, 1).fillRect(4, 4, 32, 40);  // Inner Door Panel
+      doorGfx.fillStyle(0x451a03, 1).fillRect(0, 0, 40, 48);
+      doorGfx.fillStyle(0x78350f, 1).fillRect(4, 4, 32, 40);
       doorGfx.lineStyle(2, 0x271003, 1).strokeRect(4, 4, 32, 40);
-      doorGfx.fillStyle(0xeab308, 1).fillCircle(12, 26, 3);   // Doorknob
+      doorGfx.fillStyle(0xeab308, 1).fillCircle(12, 26, 3);
       doorGfx.generateTexture('doorTex', 40, 48);
 
-      // Dungeon Exit Door (Iron Frame + Green Glow)
+      // Dungeon Exit Door
       const exitGfx = scene.make.graphics({ add: false });
-      exitGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 40, 48);  // Dark Frame
-      exitGfx.fillStyle(0x15803d, 1).fillRect(4, 4, 32, 40);  // Green Door Panel
+      exitGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 40, 48);
+      exitGfx.fillStyle(0x15803d, 1).fillRect(4, 4, 32, 40);
       exitGfx.lineStyle(2, 0x22c55e, 1).strokeRect(4, 4, 32, 40);
-      exitGfx.fillStyle(0x86efac, 1).fillCircle(12, 26, 3);   // Glow Doorknob
+      exitGfx.fillStyle(0x86efac, 1).fillCircle(12, 26, 3);
       exitGfx.generateTexture('exitDoorTex', 40, 48);
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      buildHubMap(scene);
-
+      // SPAWN HERO WITH ALWAYS-TOP DEPTH
       player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
       player.setCollideWorldBounds(true);
+      player.setDepth(10); // Player renders above tiles and walls
+
+      buildHubMap(scene);
 
       scene.physics.add.collider(player, merchant);
       scene.physics.add.collider(player, dungeonWalls);
@@ -452,16 +454,24 @@
 
       for (let x = 0; x < WORLD_SIZE; x += 32) {
         for (let y = 0; y < WORLD_SIZE; y += 32) {
-          dungeonFloorTiles.push(scene.add.image(x + 16, y + 16, 'hubTile'));
+          const tile = scene.add.image(x + 16, y + 16, 'hubTile');
+          tile.setDepth(0);
+          dungeonFloorTiles.push(tile);
         }
       }
 
-      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'soilTex');
-      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'merchantTex');
+      hubSoil = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2, 'soilTex').setDepth(1);
+      merchant = scene.physics.add.sprite(WORLD_SIZE / 2 + 120, WORLD_SIZE / 2, 'merchantTex').setDepth(1);
       merchant.setImmovable(true);
       
-      // Spawn Entrance Doorway
-      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'doorTex');
+      dungeonDoor = scene.physics.add.sprite(WORLD_SIZE / 2, WORLD_SIZE / 2 - 180, 'doorTex').setDepth(1);
+
+      // Reposition Player & Snap Camera
+      if (player) {
+        player.setPosition(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2);
+        if (player.body) player.body.reset(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2);
+        scene.cameras.main.centerOn(player.x, player.y);
+      }
 
       document.getElementById('dialogue-box').innerText = "Surface Hub: Walk up to the Dungeon Door and press [A] to enter layer!";
       updateUI();
@@ -515,21 +525,31 @@
           let py = y * TILE_SIZE + TILE_SIZE / 2;
 
           if (grid[y][x] === 0) {
-            dungeonFloorTiles.push(scene.add.image(px, py, 'dungeonTile'));
+            const floorTile = scene.add.image(px, py, 'dungeonTile');
+            floorTile.setDepth(0);
+            dungeonFloorTiles.push(floorTile);
           } else {
             let wall = dungeonWalls.create(px, py, 'wallTile');
+            wall.setDepth(1);
             wall.refreshBody();
           }
         }
       }
 
-      // Player spawns inside Room 0
+      // Spawn Player inside Room 0 Center
       let startRoom = rooms[0];
-      player.setPosition(startRoom.cx * TILE_SIZE, startRoom.cy * TILE_SIZE);
+      const spawnX = startRoom.cx * TILE_SIZE;
+      const spawnY = startRoom.cy * TILE_SIZE;
+
+      player.setPosition(spawnX, spawnY);
+      if (player.body) player.body.reset(spawnX, spawnY);
+      
+      // Instant Camera Snap to Room 0
+      scene.cameras.main.centerOn(spawnX, spawnY);
 
       // Exit Door spawns inside last Room
       let lastRoom = rooms[rooms.length - 1];
-      exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex');
+      exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex').setDepth(1);
 
       document.getElementById('dialogue-box').innerText = "Dungeon Layer Entered! Explore rooms and find the Exit Door to return to the Hub.";
       updateUI();
@@ -541,11 +561,12 @@
       if (dungeonDoor) { dungeonDoor.destroy(); dungeonDoor = null; }
       dungeonFloorTiles.forEach(t => t.destroy());
       dungeonFloorTiles = [];
+      if (dungeonWalls) dungeonWalls.clear(true, true);
     }
 
     function clearDungeon(scene) {
       if (exitDoor) { exitDoor.destroy(); exitDoor = null; }
-      dungeonWalls.clear(true, true);
+      if (dungeonWalls) dungeonWalls.clear(true, true);
       dungeonFloorTiles.forEach(t => t.destroy());
       dungeonFloorTiles = [];
     }
@@ -560,7 +581,6 @@
         const distMerchant = Phaser.Math.Distance.Between(player.x, player.y, merchant.x, merchant.y);
         const distSoil = Phaser.Math.Distance.Between(player.x, player.y, hubSoil.x, hubSoil.y);
 
-        // Enter Dungeon via Door
         if (distDoor <= 65) {
           generateDungeon(scene);
           return;
@@ -598,10 +618,8 @@
         }
       } else if (currentZone === 'DUNGEON') {
         const distExit = Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y);
-        // Exit Dungeon via Exit Door
         if (distExit <= 65) {
           buildHubMap(scene);
-          player.setPosition(WORLD_SIZE / 2, WORLD_SIZE / 2);
           return;
         }
         dialogue.innerText = "Find the Green Exit Door in the final room to extract!";
