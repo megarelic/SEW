@@ -147,7 +147,7 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.3.9</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.0</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -216,7 +216,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.3.9';
+    const GAME_VERSION = 'v1.4.0';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -535,6 +535,7 @@
     let minimapGfx;
 
     let vinePathNodes = [];
+    let vineOffshoots = [];
     let vineCurrentIndex = 0;
     let vineEvent = null;
     let vineGraphics;
@@ -794,8 +795,9 @@
         }
       }
 
-      // --- BFS PATHFINDING VINE WITH TAPERED THICKNESS & SLOWER SPEED ---
+      // --- BFS PATHFINDING VINE WITH OFFSHOOTS & 1-MINUTE GROWTH TIME ---
       vinePathNodes = [];
+      vineOffshoots = [];
       vineCurrentIndex = 0;
       vineGraphics = scene.add.graphics().setDepth(1);
 
@@ -831,10 +833,28 @@
         }
       }
 
-      vinePathNodes = shortestPath || [{ x: startNode.x, x: startNode.y }, { x: targetNode.x, y: targetNode.y }];
+      vinePathNodes = shortestPath || [{ x: startNode.x, y: startNode.y }, { x: targetNode.x, y: targetNode.y }];
+
+      // Generate random offshoots branching off main path nodes
+      vinePathNodes.forEach((node, idx) => {
+        if (idx > 0 && idx < vinePathNodes.length - 1 && Math.random() < 0.25) {
+          let dirs = [{x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}];
+          for (let d of dirs) {
+            let ox = node.x + d.x;
+            let oy = node.y + d.y;
+            if (ox > 0 && ox < MAP_GRID_SIZE - 1 && oy > 0 && oy < MAP_GRID_SIZE - 1 && dungeonGrid[oy][ox] === 0) {
+              vineOffshoots.push({ parentIndex: idx, from: node, to: { x: ox, y: oy } });
+              break;
+            }
+          }
+        }
+      });
+
+      // Target ~60 seconds (60000ms) total growth time across all nodes
+      let calculatedDelay = Math.max(80, Math.floor(60000 / Math.max(1, vinePathNodes.length)));
 
       vineEvent = scene.time.addEvent({
-        delay: 120, // Slower growth speed
+        delay: calculatedDelay,
         loop: true,
         callback: () => {
           if (currentZone !== 'DUNGEON' || isInventoryOpen || isShopOpen || isLootOpen) return;
@@ -851,13 +871,11 @@
           vineGraphics.clear();
           vineCurrentIndex++;
 
-          // Redraw entire vine up to current index with tapered thickness (older = thicker, newer = thinner)
-          let totalSegments = vineCurrentIndex;
-          for (let i = 0; i < totalSegments; i++) {
+          // Draw main tapered vine path
+          for (let i = 0; i < vineCurrentIndex; i++) {
             let p1 = vinePathNodes[i];
             let p2 = vinePathNodes[i + 1];
 
-            // Calculate thickness ratio: older segments near start (i = 0) are thick (width 6), newer tips are thin (width 1)
             let progress = i / Math.max(1, vinePathNodes.length);
             let thickness = Phaser.Math.Linear(6, 1, progress);
 
@@ -867,10 +885,21 @@
             vineGraphics.lineTo(p2.x * TILE_SIZE + TILE_SIZE/2, p2.y * TILE_SIZE + TILE_SIZE/2);
             vineGraphics.strokePath();
           }
+
+          // Draw offshoots if their parent index has been reached
+          vineOffshoots.forEach(off => {
+            if (off.parentIndex <= vineCurrentIndex) {
+              vineGraphics.lineStyle(1.5, 0x15803d, 0.8);
+              vineGraphics.beginPath();
+              vineGraphics.moveTo(off.from.x * TILE_SIZE + TILE_SIZE/2, off.from.y * TILE_SIZE + TILE_SIZE/2);
+              vineGraphics.lineTo(off.to.x * TILE_SIZE + TILE_SIZE/2, off.to.y * TILE_SIZE + TILE_SIZE/2);
+              vineGraphics.strokePath();
+            }
+          });
         }
       });
 
-      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The vine creeps slowly, thick at the base and slender at the tip!";
+      document.getElementById('dialogue-box').innerText = "Dungeon Entered: The vine creeps slowly over 1 minute toward the exit!";
       updateUI();
     }
 
