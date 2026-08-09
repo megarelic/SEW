@@ -153,11 +153,11 @@
 
   <div id="hud">
     <div class="hud-box" id="stash-info">HP: ❤️ 100 | 🪙 0 | 🌰 3</div>
-    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.4.9</div>
+    <div class="hud-box" id="version-display" style="color: #38bdf8;">v1.5.0</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory (16 Slots)</button>
   </div>
 
-  <div id="dialogue-box">Surface Hub: Precise Tile Extraction (Player at 0,7, Enemy at 0,9) Active!</div>
+  <div id="dialogue-box">Surface Hub: Wall directional tiling (4,3 top, 3,0 bottom, 0,0 void) active!</div>
 
   <div id="controls">
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
@@ -222,7 +222,7 @@
 
   <script>
     // --- VERSION CONTROL ---
-    const GAME_VERSION = 'v1.4.9';
+    const GAME_VERSION = 'v1.5.0';
     document.getElementById('version-display').innerText = GAME_VERSION;
 
     // --- 1. LOCAL STORAGE & INVENTORY ---
@@ -648,17 +648,19 @@
       scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
 
       // Extract custom exact textures from the 16x16 tilemap with 1px gap
-      extractTileTexture(scene, 'playerTex', 0, 7);   // Player at (0,7)
-      extractTileTexture(scene, 'enemyTex', 0, 9);    // Enemy at (0,9)
-      extractTileTexture(scene, 'hubFloorTex', 0, 4); // Hub ground
-      extractTileTexture(scene, 'dungFloorTex', 1, 4);// Dungeon ground
-      extractTileTexture(scene, 'wallTex', 2, 2);     // Wall
-      extractTileTexture(scene, 'soilTex', 2, 5);     // Soil plot
-      extractTileTexture(scene, 'merchantTex', 1, 7); // Merchant NPC
-      extractTileTexture(scene, 'doorTex', 6, 0);     // Dungeon Door
-      extractTileTexture(scene, 'exitTex', 7, 0);     // Exit Door
-      extractTileTexture(scene, 'corpseTex', 3, 6);   // Corpse
-      extractTileTexture(scene, 'dropTex', 4, 5);     // Ground Drop
+      extractTileTexture(scene, 'playerTex', 0, 7);      // Player at (0,7)
+      extractTileTexture(scene, 'enemyTex', 0, 9);       // Enemy at (0,9)
+      extractTileTexture(scene, 'wallTopTex', 4, 3);     // Top wall at (4,3)
+      extractTileTexture(scene, 'wallBottomTex', 3, 0);  // Bottom wall at (3,0)
+      extractTileTexture(scene, 'wallVoidTex', 0, 0);    // Internal wall void at (0,0)
+      extractTileTexture(scene, 'hubFloorTex', 0, 4);    // Hub ground
+      extractTileTexture(scene, 'dungFloorTex', 1, 4);   // Dungeon ground
+      extractTileTexture(scene, 'soilTex', 2, 5);        // Soil plot
+      extractTileTexture(scene, 'merchantTex', 1, 7);    // Merchant NPC
+      extractTileTexture(scene, 'doorTex', 6, 0);        // Dungeon Door
+      extractTileTexture(scene, 'exitTex', 7, 0);        // Exit Door
+      extractTileTexture(scene, 'corpseTex', 3, 6);      // Corpse
+      extractTileTexture(scene, 'dropTex', 4, 5);        // Ground Drop
 
       const slashGfx = scene.make.graphics({ add: false });
       slashGfx.fillStyle(0x38bdf8, 0.7);
@@ -886,7 +888,7 @@
         scene.cameras.main.centerOn(player.x, player.y);
       }
 
-      document.getElementById('dialogue-box').innerText = "Surface Hub: Player sprite extracted from (0,7)!";
+      document.getElementById('dialogue-box').innerText = "Surface Hub: Directional Wall Tiles Applied!";
       updateUI();
     }
 
@@ -942,7 +944,18 @@
             const floorTile = scene.add.image(px, py, 'dungFloorTex').setDisplaySize(32, 32).setDepth(0);
             dungeonFloorTiles.push(floorTile);
           } else {
-            let wall = dungeonWalls.create(px, py, 'wallTex');
+            let wallKey = 'wallVoidTex'; // Default internal void wall (0,0)
+
+            // Top side of a room (room floor is directly below)
+            if (y + 1 < MAP_GRID_SIZE && dungeonGrid[y + 1][x] === 0) {
+              wallKey = 'wallTopTex'; // (4,3)
+            }
+            // Bottom side of a room (room floor is directly above)
+            else if (y - 1 >= 0 && dungeonGrid[y - 1][x] === 0) {
+              wallKey = 'wallBottomTex'; // (3,0)
+            }
+
+            let wall = dungeonWalls.create(px, py, wallKey);
             wall.setScale(2);
             wall.refreshBody();
           }
