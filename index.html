@@ -116,7 +116,7 @@
     .inv-slot {
       aspect-ratio: 1; background: #0f172a; border: 1px dashed #475569; border-radius: 6px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 11px; text-align: center; padding: 4px; color: #cbd5e1; cursor: grab;
+      font-size: 10px; text-align: center; padding: 4px; color: #cbd5e1; cursor: grab;
     }
     .inv-slot.filled { border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
     .inv-slot.drag-over { border-color: #22c55e; background: rgba(34, 197, 94, 0.2); }
@@ -147,7 +147,7 @@
   </div>
 
   <div id="hud">
-    <div class="hud-box" id="stash-info">HP: ❤️ 100 | Gold: 🪙 0 | Seeds: 🌰 3</div>
+    <div class="hud-box" id="stash-info">HP: ❤️ 100 | Stash Items: 📦 0/8</div>
     <button class="hud-btn" id="btn-bag">🎒 Inventory</button>
   </div>
 
@@ -162,14 +162,10 @@
   <div id="inventory-modal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>🎒 Stash & Inventory</h2>
+        <h2>🎒 Stash & Inventory (Stackable)</h2>
         <button class="close-btn" id="btn-close-inv">✕</button>
       </div>
-      <div class="modal-stats">
-        <span id="inv-gold">Gold: 🪙 0</span>
-        <span id="inv-seeds">Seeds: 🌰 0</span>
-      </div>
-      <div class="inv-grid" id="inv-grid"></div>
+      <div class="inv-grid" id="inv-grid" style="grid-template-columns: repeat(4, 1fr); max-height: 240px;"></div>
     </div>
   </div>
 
@@ -200,11 +196,7 @@
         <h2>🏬 Surface Merchant</h2>
         <button class="close-btn" id="btn-close-shop">✕</button>
       </div>
-      <div class="modal-stats">
-        <span id="shop-gold">Gold: 🪙 0</span>
-        <span id="shop-seeds">Seeds: 🌰 0</span>
-      </div>
-      <div class="shop-section">
+      <div class="modal-section">
         <h3>Buy Supplies</h3>
         <div class="shop-row">
           <span>🌰 Sword Seed (🪙 10 Gold)</span>
@@ -219,12 +211,22 @@
   </div>
 
   <script>
-    // --- 1. LOCAL STORAGE ---
-    const DEFAULT_DATA = { hp: 100, maxHp: 100, gold: 25, seeds: 3, inventory: [] };
+    // --- 1. LOCAL STORAGE & STACKING INVENTORY ---
+    // Inventory stores objects: { name: 'Gold', count: 25 }, { name: 'Sword Seed', count: 3 }, { name: 'Iron Sword' }
+    const DEFAULT_DATA = { 
+      hp: 100, 
+      maxHp: 100, 
+      inventory: [
+        { name: 'Gold', count: 25 },
+        { name: 'Sword Seed', count: 3 }
+      ] 
+    };
+
     function getPlayerData() {
       const saved = localStorage.getItem('SEW_SAVE_DATA');
       return saved ? JSON.parse(saved) : DEFAULT_DATA;
     }
+
     function savePlayerData(data) {
       localStorage.setItem('SEW_SAVE_DATA', JSON.stringify(data));
       updateUI();
@@ -237,12 +239,60 @@
     let activeCorpseLoot = null;
     let currentZone = 'HUB';
 
-    function updateUI() {
-      document.getElementById('stash-info').innerHTML = 
-        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | Gold: 🪙 ${playerData.gold} | Seeds: 🌰 ${playerData.seeds}`;
+    function getPlayerItemCount(itemName) {
+      let total = 0;
+      playerData.inventory.forEach(item => {
+        if (item.name === itemName) total += (item.count || 1);
+      });
+      return total;
     }
 
-    // --- 2. MODALS & DRAG/DROP LOOT SYSTEM ---
+    function addPlayerItem(itemName, count = 1) {
+      // Check if stackable item already exists in inventory
+      if (itemName === 'Gold' || itemName === 'Sword Seed') {
+        let existing = playerData.inventory.find(i => i.name === itemName);
+        if (existing) {
+          existing.count = (existing.count || 1) + count;
+          savePlayerData(playerData);
+          return true;
+        }
+      }
+
+      // Otherwise try to push into new slot if space allows (Max 8 slots)
+      if (playerData.inventory.length < 8) {
+        if (itemName === 'Gold' || itemName === 'Sword Seed') {
+          playerData.inventory.push({ name: itemName, count: count });
+        } else {
+          playerData.inventory.push({ name: itemName }); // Swords don't stack
+        }
+        savePlayerData(playerData);
+        return true;
+      }
+      return false; // Inventory full
+    }
+
+    function removePlayerItem(itemName, count = 1) {
+      let existing = playerData.inventory.find(i => i.name === itemName);
+      if (!existing) return false;
+
+      if (existing.count && existing.count > count) {
+        existing.count -= count;
+      } else {
+        let idx = playerData.inventory.indexOf(existing);
+        playerData.inventory.splice(idx, 1);
+      }
+      savePlayerData(playerData);
+      return true;
+    }
+
+    function updateUI() {
+      let gold = getPlayerItemCount('Gold');
+      let seeds = getPlayerItemCount('Sword Seed');
+      document.getElementById('stash-info').innerHTML = 
+        `HP: ❤️ ${playerData.hp}/${playerData.maxHp} | 🪙 ${gold} | 🌰 ${seeds}`;
+    }
+
+    // --- 2. MODALS & DRAG/DROP STACKING LOOT ---
     const invModal = document.getElementById('inventory-modal');
     const shopModal = document.getElementById('shop-modal');
     const lootModal = document.getElementById('loot-modal');
@@ -253,16 +303,19 @@
       isInventoryOpen = show;
       invModal.style.display = show ? 'flex' : 'none';
       if (show) {
-        document.getElementById('inv-gold').innerText = `Gold: 🪙 ${playerData.gold}`;
-        document.getElementById('inv-seeds').innerText = `Seeds: 🌰 ${playerData.seeds}`;
         invGrid.innerHTML = '';
         for (let i = 0; i < 8; i++) {
           const slot = document.createElement('div');
           slot.className = 'inv-slot';
-          if (playerData.inventory[i]) {
+          let item = playerData.inventory[i];
+          if (item) {
             slot.classList.add('filled');
-            slot.innerHTML = `⚔️<br>${playerData.inventory[i]}`;
-          } else { slot.innerText = 'Empty'; }
+            if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold<br>(${item.count})`;
+            else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Seed<br>(${item.count})`;
+            else slot.innerHTML = `⚔️<br>${item.name}`;
+          } else {
+            slot.innerText = 'Empty';
+          }
           invGrid.appendChild(slot);
         }
       }
@@ -275,28 +328,27 @@
     }
 
     function refreshShopUI() {
-      document.getElementById('shop-gold').innerText = `Gold: 🪙 ${playerData.gold}`;
-      document.getElementById('shop-seeds').innerText = `Seeds: 🌰 ${playerData.seeds}`;
       shopSellList.innerHTML = '';
-      if (playerData.inventory.length === 0) {
-        shopSellList.innerHTML = `<div class="shop-row" style="color: #94a3b8;">No weapons in inventory to sell.</div>`;
+      let swords = playerData.inventory.filter(i => i.name === 'Iron Sword');
+      
+      if (swords.length === 0) {
+        shopSellList.innerHTML = `<div class="shop-row" style="color: #94a3b8;">No swords in inventory to sell.</div>`;
         return;
       }
-      playerData.inventory.forEach((item, index) => {
+
+      swords.forEach((item) => {
         const row = document.createElement('div');
         row.className = 'shop-row';
-        row.innerHTML = `<span>⚔️ ${item}</span><button class="action-shop-btn sell-btn">Sell (🪙 15)</button>`;
+        row.innerHTML = `<span>⚔️ Iron Sword</span><button class="action-shop-btn sell-btn">Sell (🪙 15)</button>`;
         row.querySelector('.sell-btn').addEventListener('click', () => {
-          playerData.inventory.splice(index, 1);
-          playerData.gold += 15;
-          savePlayerData(playerData);
+          removePlayerItem('Iron Sword', 1);
+          addPlayerItem('Gold', 15);
           refreshShopUI();
         });
         shopSellList.appendChild(row);
       });
     }
 
-    // Drag-and-Drop Loot Modal
     function openLootModal(corpseObj) {
       activeCorpseLoot = corpseObj;
       isLootOpen = true;
@@ -310,15 +362,17 @@
       npcGrid.innerHTML = '';
       playerGrid.innerHTML = '';
 
-      // Render NPC Corpse Slots
-      activeCorpseLoot.items.forEach((item, idx) => {
+      // Corpse Loot Slots
+      activeCorpseLoot.items.forEach((itemObj, idx) => {
         const slot = document.createElement('div');
         slot.className = 'inv-slot filled';
         slot.draggable = true;
-        slot.innerHTML = item === 'Gold Pouch' ? '🪙 Gold' : (item === 'Sword Seed' ? '🌰 Seed' : '⚔️ Sword');
+        if (itemObj.name === 'Gold') slot.innerHTML = `🪙 Gold<br>(${itemObj.count})`;
+        else if (itemObj.name === 'Sword Seed') slot.innerHTML = `🌰 Seed<br>(${itemObj.count})`;
+        else slot.innerHTML = `⚔️ ${itemObj.name}`;
 
         slot.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', JSON.stringify({ source: 'NPC', index: idx, item: item }));
+          e.dataTransfer.setData('text/plain', JSON.stringify({ source: 'NPC', index: idx }));
         });
         npcGrid.appendChild(slot);
       });
@@ -327,13 +381,16 @@
         npcGrid.innerHTML = '<div style="font-size:10px; color:#64748b; grid-column:span 2;">Empty</div>';
       }
 
-      // Render Player Slots
+      // Player Inventory Slots inside Loot Screen
       for (let i = 0; i < 6; i++) {
         const slot = document.createElement('div');
         slot.className = 'inv-slot';
-        if (playerData.inventory[i]) {
+        let item = playerData.inventory[i];
+        if (item) {
           slot.classList.add('filled');
-          slot.innerHTML = `⚔️<br>${playerData.inventory[i]}`;
+          if (item.name === 'Gold') slot.innerHTML = `🪙<br>Gold (${item.count})`;
+          else if (item.name === 'Sword Seed') slot.innerHTML = `🌰<br>Seed (${item.count})`;
+          else slot.innerHTML = `⚔️<br>${item.name}`;
         } else {
           slot.innerText = 'Empty';
         }
@@ -345,13 +402,11 @@
           slot.classList.remove('drag-over');
           const data = JSON.parse(e.dataTransfer.getData('text/plain'));
           if (data.source === 'NPC') {
-            // Transfer Item
-            const lootedItem = activeCorpseLoot.items.splice(data.index, 1)[0];
-            if (lootedItem === 'Gold Pouch') playerData.gold += 15;
-            else if (lootedItem === 'Sword Seed') playerData.seeds += 1;
-            else playerData.inventory.push(lootedItem);
-
-            savePlayerData(playerData);
+            const looted = activeCorpseLoot.items.splice(data.index, 1)[0];
+            let success = addPlayerItem(looted.name, looted.count || 1);
+            if (!success) {
+              activeCorpseLoot.items.push(looted); // Return to corpse if inventory full
+            }
             renderLootGrid();
           }
         });
@@ -360,11 +415,13 @@
     }
 
     document.getElementById('btn-buy-seed').addEventListener('click', () => {
-      if (playerData.gold >= 10) {
-        playerData.gold -= 10;
-        playerData.seeds += 1;
-        savePlayerData(playerData);
-        refreshShopUI();
+      let goldCount = getPlayerItemCount('Gold');
+      if (goldCount >= 10) {
+        removePlayerItem('Gold', 10);
+        addPlayerItem('Sword Seed', 1);
+        document.getElementById('dialogue-box').innerText = "Purchased 1 Sword Seed!";
+      } else {
+        document.getElementById('dialogue-box').innerText = "Not enough Gold to buy a seed!";
       }
     });
 
@@ -373,7 +430,7 @@
     document.getElementById('btn-close-shop').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleShop(false); });
     document.getElementById('btn-close-loot').addEventListener('pointerdown', (e) => { e.preventDefault(); isLootOpen = false; lootModal.style.display = 'none'; });
 
-    // --- 3. VIRTUAL ANALOG JOYSTICK WITH THRESHOLD ---
+    // --- 3. VIRTUAL JOYSTICK ---
     let joystickVector = { x: 0, y: 0 };
     let joystickDistance = 0;
     let joystickActive = false;
@@ -382,7 +439,7 @@
     const jZone = document.getElementById('joystick-zone');
     const jKnob = document.getElementById('joystick-knob');
     const maxRadius = 35;
-    const MOVE_THRESHOLD = 12; // Radius threshold before player moves
+    const MOVE_THRESHOLD = 12;
 
     jZone.addEventListener('touchstart', (e) => {
       if (isInventoryOpen || isShopOpen || isLootOpen) return;
@@ -470,7 +527,6 @@
       const scene = this;
       scene.physics.world.setBounds(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-      // PROCEDURAL GRAPHICS
       const grassGfx = scene.make.graphics({ add: false });
       grassGfx.fillStyle(0x0f172a, 1).fillRect(0, 0, 32, 32);
       grassGfx.lineStyle(1, 0x1e293b, 0.5).strokeRect(0, 0, 32, 32);
@@ -491,14 +547,12 @@
       soilGfx.lineStyle(2, 0x451a03, 1).strokeRect(0, 0, 48, 48);
       soilGfx.generateTexture('soilTex', 48, 48);
 
-      // Player Sprite with Front Pointer Nose
       const playerGfx = scene.make.graphics({ add: false });
       playerGfx.fillStyle(0x38bdf8, 1).fillRect(4, 4, 24, 24);
       playerGfx.fillStyle(0xef4444, 1).fillRect(4, 0, 24, 8);
-      playerGfx.fillStyle(0xfbebe8, 1).fillRect(20, 10, 8, 12); // Facing Nose
+      playerGfx.fillStyle(0xfbebe8, 1).fillRect(20, 10, 8, 12);
       playerGfx.generateTexture('playerTex', 32, 32);
 
-      // Sword Swing Arc Graphic
       const slashGfx = scene.make.graphics({ add: false });
       slashGfx.fillStyle(0x38bdf8, 0.7);
       slashGfx.slice(24, 24, 30, Phaser.Math.DegToRad(-45), Phaser.Math.DegToRad(45), false);
@@ -535,14 +589,12 @@
 
       dungeonWalls = scene.physics.add.staticGroup();
 
-      // HERO & SWORD SLASH SPRITE
       player = scene.physics.add.sprite(WORLD_SIZE / 2 - 80, WORLD_SIZE / 2, 'playerTex');
       player.setCollideWorldBounds(true);
       player.setDepth(10);
       player.body.setSize(18, 18).setOffset(7, 7);
 
       swordSlash = scene.add.sprite(0, 0, 'slashTex').setDepth(11).setVisible(false);
-
       minimapGfx = scene.add.graphics().setScrollFactor(0).setDepth(100);
 
       buildHubMap(scene);
@@ -665,7 +717,6 @@
       let lastRoom = rooms[rooms.length - 1];
       exitDoor = scene.physics.add.sprite(lastRoom.cx * TILE_SIZE, lastRoom.cy * TILE_SIZE, 'exitDoorTex').setDepth(1);
 
-      // Spawn Enemies with Overhead HP Bars
       for (let i = 1; i < rooms.length - 1; i++) {
         let rm = rooms[i];
         
@@ -680,7 +731,6 @@
         enemy.hp = 40;
         enemy.body.setSize(20, 20);
 
-        // Health Bar Graphic Overlay
         enemy.hpBar = scene.add.graphics().setDepth(3);
         updateEnemyHpBar(enemy);
 
@@ -701,11 +751,9 @@
       const x = enemy.x - barW / 2;
       const y = enemy.y - 22;
 
-      // Background
       enemy.hpBar.fillStyle(0x0f172a, 1);
       enemy.hpBar.fillRect(x, y, barW, barH);
 
-      // Health Fill
       const fillW = Math.max(0, (enemy.hp / enemy.maxHp) * barW);
       const color = enemy.hp / enemy.maxHp > 0.4 ? 0x22c55e : 0xef4444;
       enemy.hpBar.fillStyle(color, 1);
@@ -742,12 +790,10 @@
       minimapGfx.clear();
     }
 
-    // --- ATTACK & INTERACTION LOGIC ---
     function handleInteraction(scene) {
       if (isInventoryOpen || isShopOpen || isLootOpen) return;
       const dialogue = document.getElementById('dialogue-box');
 
-      // Trigger Sword Swing Attack Animation
       playAttackAnimation(scene);
 
       if (currentZone === 'HUB') {
@@ -771,7 +817,6 @@
           return;
         }
       } else if (currentZone === 'DUNGEON') {
-        // 1. Open Loot Screen on Corpse
         for (let corpse of dungeonCorpses) {
           if (Phaser.Math.Distance.Between(player.x, player.y, corpse.x, corpse.y) <= 50) {
             openLootModal(corpse);
@@ -779,11 +824,10 @@
           }
         }
 
-        // 2. Attack nearby enemy in facing direction
         for (let i = dungeonEnemies.length - 1; i >= 0; i--) {
           let mob = dungeonEnemies[i];
+          let hasSword = playerData.inventory.some(i => i.name === 'Iron Sword');
           if (Phaser.Math.Distance.Between(player.x, player.y, mob.x, mob.y) <= 65) {
-            let hasSword = playerData.inventory.includes('Iron Sword');
             let damage = hasSword ? 20 : 10;
             mob.hp -= damage;
             updateEnemyHpBar(mob);
@@ -794,13 +838,17 @@
             dialogue.innerText = `Swung weapon for ${damage} DMG! (Mob HP: ${Math.max(0, mob.hp)})`;
 
             if (mob.hp <= 0) {
-              // Convert mob to Corpse
               if (mob.hpBar) mob.hpBar.destroy();
               let corpse = scene.physics.add.sprite(mob.x, mob.y, 'corpseTex').setDepth(1);
-              corpse.items = ['Gold Pouch', Math.random() > 0.5 ? 'Sword Seed' : 'Iron Sword'];
+              
+              // Generated Corpse Loot Stacks
+              corpse.items = [
+                { name: 'Gold', count: Phaser.Math.Between(10, 20) },
+                { name: Math.random() > 0.4 ? 'Sword Seed' : 'Iron Sword', count: 1 }
+              ];
               dungeonCorpses.push(corpse);
 
-              dialogue.innerText = "Enemy slain! Press [A] over corpse to open drag & drop loot screen.";
+              dialogue.innerText = "Enemy slain! Press [A] over corpse to open loot window.";
               mob.destroy();
               dungeonEnemies.splice(i, 1);
             }
@@ -808,7 +856,6 @@
           }
         }
 
-        // 3. Dungeon Soil
         for (let dSoil of dungeonSoilList) {
           if (Phaser.Math.Distance.Between(player.x, player.y, dSoil.x, dSoil.y) <= 60) {
             handleSoilInteraction(scene, dSoil, dialogue);
@@ -816,7 +863,6 @@
           }
         }
 
-        // 4. Exit Door
         const distExit = Phaser.Math.Distance.Between(player.x, player.y, exitDoor.x, exitDoor.y);
         if (distExit <= 65) {
           buildHubMap(scene);
@@ -841,9 +887,9 @@
 
     function handleSoilInteraction(scene, soilObj, dialogue) {
       if (soilObj.state === 'EMPTY') {
-        if (playerData.seeds > 0) {
-          playerData.seeds -= 1;
-          savePlayerData(playerData);
+        let seedCount = getPlayerItemCount('Sword Seed');
+        if (seedCount > 0) {
+          removePlayerItem('Sword Seed', 1);
           soilObj.state = 'GROWING';
           soilObj.setTint(0xeab308);
           dialogue.innerText = "Planted a Sword Seed! Maturing in 3 seconds...";
@@ -856,24 +902,20 @@
       } else if (soilObj.state === 'READY') {
         soilObj.state = 'EMPTY';
         soilObj.clearTint();
-        playerData.inventory.push('Iron Sword');
-        playerData.gold += 15;
-        savePlayerData(playerData);
-        dialogue.innerText = "Harvested an Iron Sword! Added to your inventory.";
+        addPlayerItem('Iron Sword', 1);
+        addPlayerItem('Gold', 15);
+        dialogue.innerText = "Harvested an Iron Sword & 15 Gold added to inventory!";
       }
     }
 
-    // --- GAME LOOP & MINIMAP ---
     function update(time, delta) {
       player.body.setVelocity(0);
       if (isInventoryOpen || isShopOpen || isLootOpen) return;
 
-      // Analog Joystick Rotation & Threshold Movement
       if (joystickActive) {
         let angle = Math.atan2(joystickVector.y, joystickVector.x);
         player.setRotation(angle);
 
-        // Move player only when pushed past threshold radius
         if (joystickDistance > MOVE_THRESHOLD) {
           player.body.setVelocity(joystickVector.x * SPEED, joystickVector.y * SPEED);
         }
@@ -887,7 +929,6 @@
         player.body.velocity.normalize().scale(SPEED);
       }
 
-      // Enemy AI & Contact Damage
       if (currentZone === 'DUNGEON') {
         dungeonEnemies.forEach(mob => {
           updateEnemyHpBar(mob);
